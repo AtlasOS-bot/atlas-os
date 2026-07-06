@@ -8,14 +8,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Test Atlas Brain Connection
+      - name: Test write to Atlas Brain
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          curl "$SUPABASE_URL/rest/v1/" \
+          curl -X POST "$SUPABASE_URL/rest/v1/raw_drops" \
             -H "apikey: $SUPABASE_SERVICE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY"
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d '{
+              "brand": "Starbucks",
+              "title": "Atlas Starbucks Scout Test Drop",
+              "url": "https://about.starbucks.com/",
+              "raw_text": "This is a test record from GitHub Actions.",
+              "already_scored": false
+            }'
