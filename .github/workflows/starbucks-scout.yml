@@ -10,28 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Starbucks Newsroom Scout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Starbucks Scout
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          PAGE=$(curl -L -s "https://about.starbucks.com/press/news-blog/")
-
-          TITLE=$(echo "$PAGE" | grep -o '<h2[^>]*>[^<]*</h2>' | head -1 | sed 's/<[^>]*>//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-          if [ -z "$TITLE" ]; then
-            TITLE="Starbucks News Blog Check"
-          fi
-
-          curl -X POST "$SUPABASE_URL/rest/v1/raw_drops" \
-            -H "apikey: $SUPABASE_SERVICE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            -d "{
-              \"brand\": \"Starbucks\",
-              \"title\": \"$TITLE\",
-              \"url\": \"https://about.starbucks.com/press/news-blog/\",
-              \"raw_text\": \"Detected from official Starbucks News Blog.\",
-              \"already_scored\": false
-            }"
+        run: python scouts/starbucks.py
