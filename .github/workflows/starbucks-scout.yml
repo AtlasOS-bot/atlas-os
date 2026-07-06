@@ -2,26 +2,36 @@ name: Starbucks Scout
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
 
 jobs:
   scout:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test write to Atlas Brain
+      - name: Starbucks Newsroom Scout
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          PAGE=$(curl -L -s "https://about.starbucks.com/press/news-blog/")
+
+          TITLE=$(echo "$PAGE" | grep -o '<h2[^>]*>[^<]*</h2>' | head -1 | sed 's/<[^>]*>//g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          if [ -z "$TITLE" ]; then
+            TITLE="Starbucks News Blog Check"
+          fi
+
           curl -X POST "$SUPABASE_URL/rest/v1/raw_drops" \
             -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
-            -d '{
-              "brand": "Starbucks",
-              "title": "Atlas Starbucks Scout Test Drop",
-              "url": "https://about.starbucks.com/",
-              "raw_text": "This is a test record from GitHub Actions.",
-              "already_scored": false
-            }'
+            -d "{
+              \"brand\": \"Starbucks\",
+              \"title\": \"$TITLE\",
+              \"url\": \"https://about.starbucks.com/press/news-blog/\",
+              \"raw_text\": \"Detected from official Starbucks News Blog.\",
+              \"already_scored\": false
+            }"
