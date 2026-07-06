@@ -1,0 +1,20 @@
+name: Starbucks Scout
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Atlas Scout Started
+        run: |
+          echo "=========================="
+          echo "ATLAS STARBUCKS SCOUT"
+          echo "Scout Activated"
+          echo "Checking for new Starbucks drops..."
+          echo "=========================="
