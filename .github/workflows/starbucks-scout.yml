@@ -8,14 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Atlas Connection
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Atlas Brain Connection
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          echo "================================="
-          echo "ATLAS STARBUCKS SCOUT"
-          echo "================================="
-          echo "Scout is awake."
-          echo "Supabase URL loaded:"
-          echo $SUPABASE_URL
-          echo "Connection test complete."
+          curl "$SUPABASE_URL/rest/v1/" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY"
