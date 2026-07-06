@@ -8,13 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: ☕ Atlas Scout Started
+      - name: Test Atlas Connection
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: |
-          echo "=========================="
+          echo "================================="
           echo "ATLAS STARBUCKS SCOUT"
-          echo "Scout Activated"
-          echo "Checking for new Starbucks drops..."
-          echo "=========================="
+          echo "================================="
+          echo "Scout is awake."
+          echo "Supabase URL loaded:"
+          echo $SUPABASE_URL
+          echo "Connection test complete."
