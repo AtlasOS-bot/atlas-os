@@ -2,7 +2,6 @@ import json
 import os
 import re
 from datetime import datetime, timezone, timedelta
-from email.utils import parsedate_to_datetime
 
 import requests
 from bs4 import BeautifulSoup
@@ -28,28 +27,21 @@ def clean_text(text):
 
 def extract_date_and_title(text):
     text = clean_text(text)
-
     match = re.match(r"([A-Z][a-z]{2} \d{2}, \d{4}, \d{2}:\d{2} ET)\s+(.*)", text)
 
     if not match:
         return None, text
 
-    date_text = match.group(1)
-    title = match.group(2)
-
-    try:
-        published = datetime.strptime(date_text, "%b %d, %Y, %H:%M ET")
-        published = published.replace(tzinfo=timezone.utc)
-        return published.isoformat(), title
-    except Exception:
-        return None, title
+    published = datetime.strptime(match.group(1), "%b %d, %Y, %H:%M ET")
+    published = published.replace(tzinfo=timezone.utc)
+    return published.isoformat(), match.group(2)
 
 
 def is_recent(published_at):
     if not published_at:
         return False
 
-    published = parsedate_to_datetime(published_at)
+    published = datetime.fromisoformat(published_at)
     now = datetime.now(timezone.utc)
 
     return published >= now - timedelta(days=MAX_DAYS_OLD)
@@ -57,13 +49,11 @@ def is_recent(published_at):
 
 def drop_already_exists(url):
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
-
     r = requests.get(
         endpoint,
         headers=supabase_headers(),
         params={"url": f"eq.{url}", "select": "id", "limit": "1"},
     )
-
     r.raise_for_status()
     return len(r.json()) > 0
 
@@ -78,7 +68,6 @@ def save_to_supabase(brand, title, url, raw_text, published_at):
         return
 
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
-
     payload = {
         "brand": brand,
         "title": title,
@@ -89,10 +78,8 @@ def save_to_supabase(brand, title, url, raw_text, published_at):
     }
 
     r = requests.post(endpoint, json=payload, headers=supabase_headers())
-
     print(f"{brand}: {r.status_code}")
     print(r.text)
-
     r.raise_for_status()
 
 
