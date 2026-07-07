@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-STARBUCKS_URL = "https://about.starbucks.com/press/news-blog/"
+STARBUCKS_URL = "https://about.starbucks.com/sitemap.xml"
 
 
 def save_to_supabase(title: str, url: str, raw_text: str) -> None:
@@ -34,7 +34,11 @@ def save_to_supabase(title: str, url: str, raw_text: str) -> None:
 
 
 def main() -> None:
-    response = requests.get(STARBUCKS_URL, timeout=20)
+    response = requests.get(
+    STARBUCKS_URL,
+    timeout=20,
+    headers={"User-Agent": "AtlasOS personal research scout"}
+)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
