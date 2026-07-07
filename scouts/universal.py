@@ -18,15 +18,12 @@ def supabase_headers():
 
 def drop_already_exists(url):
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
-    params = {
-        "url": f"eq.{url}",
-        "select": "id",
-        "limit": "1",
-    }
-
-    r = requests.get(endpoint, headers=supabase_headers(), params=params)
+    r = requests.get(
+        endpoint,
+        headers=supabase_headers(),
+        params={"url": f"eq.{url}", "select": "id", "limit": "1"},
+    )
     r.raise_for_status()
-
     return len(r.json()) > 0
 
 
@@ -36,7 +33,6 @@ def save_to_supabase(brand, title, url, raw_text):
         return
 
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
-
     payload = {
         "brand": brand,
         "title": title,
@@ -54,7 +50,10 @@ def save_to_supabase(brand, title, url, raw_text):
 def find_latest_article(source_url, keyword):
     headers = {"User-Agent": "Mozilla/5.0 AtlasOS personal research scout"}
     response = requests.get(source_url, headers=headers, timeout=20)
-    response.raise_for_status()
+
+    if response.status_code != 200:
+        print(f"Source skipped: {source_url} returned {response.status_code}")
+        return None, None
 
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -67,7 +66,8 @@ def find_latest_article(source_url, keyword):
                 href = "https://www.prnewswire.com" + href
             return title, href
 
-    return f"{keyword} Scout Check", source_url
+    print(f"No matching article found for keyword: {keyword}")
+    return None, None
 
 
 def main():
@@ -76,12 +76,16 @@ def main():
 
     for item in brands:
         brand = item["brand"]
-        source_url = item["source_url"]
-        keyword = item["required_keyword"]
-
         print(f"Checking {brand}...")
 
-        title, url = find_latest_article(source_url, keyword)
+        title, url = find_latest_article(
+            item["source_url"],
+            item["required_keyword"],
+        )
+
+        if not title or not url:
+            print(f"{brand}: no save this run.")
+            continue
 
         save_to_supabase(
             brand=brand,
