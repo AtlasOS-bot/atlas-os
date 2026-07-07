@@ -1,63 +1,68 @@
 import os
+import re
 import requests
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-RSS_URL = "https://stories.starbucks.com/feed/"
+STARBUCKS_URL = "https://about.starbucks.com/"
 
 
-def save_to_supabase(title, url):
+def save_to_supabase(title, url, raw_text):
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
 
     payload = {
         "brand": "Starbucks",
         "title": title,
         "url": url,
-        "raw_text": "Collected by Atlas Python Scout",
-        "already_scored": False
+        "raw_text": raw_text,
+        "already_scored": False,
     }
 
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "Prefer": "return=representation",
     }
 
     r = requests.post(endpoint, json=payload, headers=headers)
-
     print(r.status_code)
     print(r.text)
-
     r.raise_for_status()
 
 
-def main():
+def clean_text(text):
+    return re.sub(r"\s+", " ", text).strip()
 
+
+def main():
     headers = {
-        "User-Agent": "Mozilla/5.0 AtlasOS"
+        "User-Agent": "Mozilla/5.0 (compatible; AtlasOS/1.0; personal research)"
     }
 
-    response = requests.get(RSS_URL, headers=headers, timeout=20)
+    response = requests.get(STARBUCKS_URL, headers=headers, timeout=20)
     response.raise_for_status()
 
-    root = ET.fromstring(response.content)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    item = root.find("./channel/item")
+    headlines = []
+    for tag in soup.find_all(["h1", "h2", "h3"]):
+        text = clean_text(tag.get_text(" ", strip=True))
+        if len(text) > 20 and "Starbucks" in text:
+            headlines.append(text)
 
-    if item is None:
-        print("No stories found.")
-        return
+    if headlines:
+        title = headlines[0]
+    else:
+        title = "Starbucks Homepage Scout Check"
 
-    title = item.findtext("title")
-    link = item.findtext("link")
-
-    print(title)
-    print(link)
-
-    save_to_supabase(title, link)
+    save_to_supabase(
+        title=title,
+        url=STARBUCKS_URL,
+        raw_text="Collected from official Starbucks homepage by Atlas Python Scout.",
+    )
 
 
 if __name__ == "__main__":
