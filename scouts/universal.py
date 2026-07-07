@@ -10,6 +10,23 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 MAX_DAYS_OLD = 30
 
+DROP_KEYWORDS = [
+    "coming soon",
+    "launch",
+    "released",
+    "available",
+    "new",
+    "exclusive",
+    "limited",
+    "collection",
+    "plush",
+    "pokemon center",
+    "celebrate",
+    "anniversary",
+    "festival",
+    "drop",
+]
+
 
 def supabase_headers():
     return {
@@ -26,7 +43,6 @@ def clean_text(text):
 
 def parse_date(text):
     text = clean_text(text)
-
     patterns = [
         (r"([A-Z][a-z]{2} \d{2}, \d{4}, \d{2}:\d{2} ET)", "%b %d, %Y, %H:%M ET"),
         (r"([A-Z][a-z]+ \d{1,2}, \d{4})", "%B %d, %Y"),
@@ -62,6 +78,11 @@ def is_recent(published_at):
     return published >= now - timedelta(days=MAX_DAYS_OLD)
 
 
+def is_drop_like(title):
+    lower = title.lower()
+    return any(keyword in lower for keyword in DROP_KEYWORDS)
+
+
 def drop_already_exists(url):
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
     r = requests.get(
@@ -74,8 +95,11 @@ def drop_already_exists(url):
 
 
 def save_to_supabase(brand, title, url, raw_text, published_at):
-    if not is_recent(published_at):
-        print(f"SKIP OLD/UNDATED: {title} | date={published_at}")
+    recent = is_recent(published_at)
+    drop_like = is_drop_like(title)
+
+    if not recent and not drop_like:
+        print(f"SKIP OLD/UNDATED NOT DROP-LIKE: {title} | date={published_at}")
         return
 
     if drop_already_exists(url):
@@ -128,13 +152,9 @@ def find_latest_article(source_url, keyword):
         return None, None, None
 
     soup = BeautifulSoup(response.text, "html.parser")
-
-    total_links = 0
-    keyword_links = 0
     candidates = []
 
     for a in soup.find_all("a", href=True):
-        total_links += 1
         raw_title = clean_text(a.get_text(" ", strip=True))
         href = normalize_url(source_url, a["href"])
 
@@ -144,29 +164,27 @@ def find_latest_article(source_url, keyword):
         if keyword.lower() not in raw_title.lower():
             continue
 
-        keyword_links += 1
         published_at = parse_date(raw_title)
         clean_title = remove_date_from_title(raw_title)
 
         candidates.append((clean_title, href, published_at, raw_title))
 
-    print(f"Total links found: {total_links}")
-    print(f"Keyword matches found: {keyword_links}")
+    print(f"Candidates found: {len(candidates)}")
 
     if candidates:
         print("Top candidates:")
         for idx, (title, href, published_at, raw_title) in enumerate(candidates[:5], start=1):
-            recent_status = "RECENT" if is_recent(published_at) else "OLD/UNDATED"
-            print(f"{idx}. {recent_status} | date={published_at} | title={title}")
+            status = "RECENT" if is_recent(published_at) else "UNDATED"
+            drop_status = "DROP-LIKE" if is_drop_like(title) else "NOT DROP-LIKE"
+            print(f"{idx}. {status} | {drop_status} | date={published_at} | title={title}")
             print(f"   url={href}")
 
     for title, href, published_at, raw_title in candidates:
-        if is_recent(published_at):
+        if is_recent(published_at) or is_drop_like(title):
             return title, href, published_at
 
     if candidates:
-        title, href, published_at, raw_title = candidates[0]
-        return title, href, published_at
+        return candidates[0][0], candidates[0][1], candidates[0][2]
 
     print(f"No matching article found for keyword: {keyword}")
     return None, None, None
