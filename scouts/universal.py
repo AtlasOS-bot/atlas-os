@@ -75,11 +75,11 @@ def drop_already_exists(url):
 
 def save_to_supabase(brand, title, url, raw_text, published_at):
     if not is_recent(published_at):
-        print(f"Old or undated skipped: {title} | {published_at}")
+        print(f"SKIP OLD/UNDATED: {title} | date={published_at}")
         return
 
     if drop_already_exists(url):
-        print(f"Duplicate skipped: {title}")
+        print(f"SKIP DUPLICATE: {title}")
         return
 
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
@@ -93,52 +93,79 @@ def save_to_supabase(brand, title, url, raw_text, published_at):
     }
 
     r = requests.post(endpoint, json=payload, headers=supabase_headers())
-    print(f"{brand}: {r.status_code}")
+    print(f"SAVED {brand}: {r.status_code}")
     print(r.text)
     r.raise_for_status()
 
 
+def normalize_url(source_url, href):
+    if href.startswith("http"):
+        return href
+
+    if "prnewswire.com" in source_url:
+        return "https://www.prnewswire.com" + href
+    if "disneyparksblog.com" in source_url:
+        return "https://disneyparksblog.com" + href
+    if "lego.com" in source_url:
+        return "https://www.lego.com" + href
+    if "pokemon.com" in source_url:
+        return "https://www.pokemon.com" + href
+    if "funko.com" in source_url:
+        return "https://investor.funko.com" + href
+
+    return source_url.rstrip("/") + "/" + href.lstrip("/")
+
+
 def find_latest_article(source_url, keyword):
     headers = {"User-Agent": "Mozilla/5.0 AtlasOS personal research scout"}
+    print(f"Source: {source_url}")
+    print(f"Keyword: {keyword}")
+
     response = requests.get(source_url, headers=headers, timeout=20)
 
     if response.status_code != 200:
-        print(f"Source skipped: {source_url} returned {response.status_code}")
+        print(f"SKIP SOURCE: returned {response.status_code}")
         return None, None, None
 
     soup = BeautifulSoup(response.text, "html.parser")
+
+    total_links = 0
+    keyword_links = 0
     candidates = []
 
     for a in soup.find_all("a", href=True):
-        title = clean_text(a.get_text(" ", strip=True))
-        href = a["href"]
+        total_links += 1
+        raw_title = clean_text(a.get_text(" ", strip=True))
+        href = normalize_url(source_url, a["href"])
 
-        if len(title) < 20:
+        if len(raw_title) < 15:
             continue
 
-        if keyword.lower() not in title.lower():
+        if keyword.lower() not in raw_title.lower():
             continue
 
-        published_at = parse_date(title)
-        clean_title = remove_date_from_title(title)
+        keyword_links += 1
+        published_at = parse_date(raw_title)
+        clean_title = remove_date_from_title(raw_title)
 
-        if href.startswith("/"):
-            if "prnewswire.com" in source_url:
-                href = "https://www.prnewswire.com" + href
-            elif "disneyparksblog.com" in source_url:
-                href = "https://disneyparksblog.com" + href
-            elif "lego.com" in source_url:
-                href = "https://www.lego.com" + href
+        candidates.append((clean_title, href, published_at, raw_title))
 
-        candidates.append((clean_title, href, published_at))
+    print(f"Total links found: {total_links}")
+    print(f"Keyword matches found: {keyword_links}")
 
-    for title, href, published_at in candidates:
+    if candidates:
+        print("Top candidates:")
+        for idx, (title, href, published_at, raw_title) in enumerate(candidates[:5], start=1):
+            recent_status = "RECENT" if is_recent(published_at) else "OLD/UNDATED"
+            print(f"{idx}. {recent_status} | date={published_at} | title={title}")
+            print(f"   url={href}")
+
+    for title, href, published_at, raw_title in candidates:
         if is_recent(published_at):
             return title, href, published_at
 
     if candidates:
-        title, href, published_at = candidates[0]
-        print(f"Found only old/undated article: {title} | {published_at}")
+        title, href, published_at, raw_title = candidates[0]
         return title, href, published_at
 
     print(f"No matching article found for keyword: {keyword}")
@@ -151,7 +178,10 @@ def main():
 
     for item in brands:
         brand = item["brand"]
-        print(f"Checking {brand}...")
+        print("")
+        print("==============================")
+        print(f"Checking {brand}")
+        print("==============================")
 
         title, url, published_at = find_latest_article(
             item["source_url"],
