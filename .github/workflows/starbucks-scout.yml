@@ -1,4 +1,4 @@
-name: Starbucks Scout
+name: Atlas Universal Scout
 
 on:
   workflow_dispatch:
@@ -21,8 +21,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Starbucks Scout
+      - name: Run Atlas Universal Scout
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python scouts/starbucks.py
+        run: python scouts/universal.py
