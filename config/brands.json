@@ -4,5 +4,29 @@
     "source_name": "PR Newswire Starbucks",
     "source_url": "https://www.prnewswire.com/news/starbucks-coffee-company/",
     "required_keyword": "Starbucks"
+  },
+  {
+    "brand": "Disney",
+    "source_name": "PR Newswire Disney",
+    "source_url": "https://www.prnewswire.com/news/the-walt-disney-company/",
+    "required_keyword": "Disney"
+  },
+  {
+    "brand": "LEGO",
+    "source_name": "PR Newswire LEGO",
+    "source_url": "https://www.prnewswire.com/news/lego-systems-inc/",
+    "required_keyword": "LEGO"
+  },
+  {
+    "brand": "Funko",
+    "source_name": "PR Newswire Funko",
+    "source_url": "https://www.prnewswire.com/news/funko/",
+    "required_keyword": "Funko"
+  },
+  {
+    "brand": "Mattel",
+    "source_name": "PR Newswire Mattel",
+    "source_url": "https://www.prnewswire.com/news/mattel-inc/",
+    "required_keyword": "Mattel"
   }
 ]
