@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Atlas OS</title>
+  <style>
+    body {
+      margin: 0;
+      background: #050A0F;
+      color: #EAFBFF;
+      font-family: Arial, sans-serif;
+    }
+
+    .shell {
+      padding: 30px;
+    }
+
+    h1 {
+      color: #00F5FF;
+      font-size: 44px;
+      letter-spacing: 4px;
+      margin-bottom: 0;
+    }
+
+    .subtitle {
+      color: #9FDBFF;
+      letter-spacing: 2px;
+      margin-bottom: 30px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: #07131F;
+      border: 1px solid #00F5FF55;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 0 18px #00F5FF22;
+    }
+
+    .card h2 {
+      color: #00F5FF;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .metric {
+      font-size: 38px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #07131F;
+      border: 1px solid #00F5FF55;
+      box-shadow: 0 0 18px #00F5FF22;
+    }
+
+    th, td {
+      padding: 14px;
+      border-bottom: 1px solid #123042;
+      text-align: left;
+    }
+
+    th {
+      color: #00F5FF;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    a {
+      color: #00F5FF;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <h1>ATLAS OS</h1>
+    <div class="subtitle">MARKET INTELLIGENCE COMMAND CENTER</div>
+
+    <div class="cards">
+      <div class="card">
+        <h2>OPPORTUNITIES</h2>
+        <div class="metric" id="oppCount">--</div>
+      </div>
+
+      <div class="card">
+        <h2>AVG SCORE</h2>
+        <div class="metric" id="avgScore">--</div>
+      </div>
+
+      <div class="card">
+        <h2>STRONG SIGNALS</h2>
+        <div class="metric" id="strongSignals">--</div>
+      </div>
+
+      <div class="card">
+        <h2>ALERTS</h2>
+        <div class="metric" id="alertCount">--</div>
+      </div>
+    </div>
+
+    <h2 style="color:#00F5FF;">TOP OPPORTUNITIES</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Brand</th>
+          <th>Item</th>
+          <th>Score</th>
+          <th>Signal</th>
+          <th>Action</th>
+          <th>eBay</th>
+        </tr>
+      </thead>
+      <tbody id="opportunityRows"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "PASTE_SUPABASE_URL_HERE";
+    const SUPABASE_ANON_KEY = "PASTE_SUPABASE_PUBLISHABLE_KEY_HERE";
+
+    async function fetchData(table) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc&limit=50`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+
+      return await res.json();
+    }
+
+    async function loadDashboard() {
+      const opportunities = await fetchData("opportunities");
+      const notifications = await fetchData("notifications");
+
+      document.getElementById("oppCount").innerText = opportunities.length;
+      document.getElementById("alertCount").innerText = notifications.length;
+
+      const avg = opportunities.length
+        ? Math.round(opportunities.reduce((s, x) => s + (x.confidence_score || 0), 0) / opportunities.length)
+        : 0;
+
+      document.getElementById("avgScore").innerText = avg;
+
+      document.getElementById("strongSignals").innerText =
+        opportunities.filter(x => x.market_signal_status === "strong").length;
+
+      const rows = opportunities
+        .sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0))
+        .map(x => `
+          <tr>
+            <td>${x.brand || ""}</td>
+            <td>${x.item_name || ""}</td>
+            <td>${x.confidence_score || ""}</td>
+            <td>${x.market_signal_status || ""}</td>
+            <td>${x.recommended_action || ""}</td>
+            <td>${x.ebay_sold_comps_url ? `<a href="${x.ebay_sold_comps_url}" target="_blank">View</a>` : ""}</td>
+          </tr>
+        `)
+        .join("");
+
+      document.getElementById("opportunityRows").innerHTML = rows;
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
