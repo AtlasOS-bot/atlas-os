@@ -3,9 +3,9 @@ import requests
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 
-
-ALERT_LEVELS_TO_NOTIFY = ["🔴 CRITICAL", "🟠 HIGH"]
+ALERT_LEVELS_TO_SEND = ["🔴 CRITICAL", "🟠 HIGH"]
 
 
 def headers():
@@ -17,70 +17,85 @@ def headers():
     }
 
 
-def get_opportunities_to_alert():
-    endpoint = f"{SUPABASE_URL}/rest/v1/opportunities"
-    params = {
-        "alert_level": f"in.({','.join(ALERT_LEVELS_TO_NOTIFY)})",
-        "status": "eq.new",
-        "select": "*",
-        "limit": "20",
-        "order": "created_at.desc",
-    }
-
-    r = requests.get(endpoint, headers=headers(), params=params)
+def get_unsent_notifications():
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/notifications",
+        headers=headers(),
+        params={
+            "sent": "eq.false",
+            "select": "*, opportunities(*)",
+            "limit": "10",
+            "order": "created_at.desc",
+        },
+    )
     r.raise_for_status()
     return r.json()
 
 
-def notification_exists(opportunity_id):
-    endpoint = f"{SUPABASE_URL}/rest/v1/notifications"
-    params = {
-        "opportunity_id": f"eq.{opportunity_id}",
-        "select": "id",
-        "limit": "1",
-    }
+def send_to_discord(note):
+    opp = note.get("opportunities") or {}
 
-    r = requests.get(endpoint, headers=headers(), params=params)
-    r.raise_for_status()
-    return len(r.json()) > 0
+    if note["alert_level"] not in ALERT_LEVELS_TO_SEND:
+        return False
 
+    title = opp.get("item_name", "Unknown Opportunity")
+    brand = opp.get("brand", "Unknown Brand")
+    score = opp.get("confidence_score", "N/A")
+    action = opp.get("recommended_action", "Review")
+    reason = opp.get("atlas_reason", "No Atlas reason yet.")
+    ebay = opp.get("ebay_sold_comps_url", "No eBay link yet.")
+    source = opp.get("official_url") or "No official link yet."
 
-def create_notification(opp):
-    if notification_exists(opp["id"]):
-        print(f"Notification already exists: {opp['item_name']}")
-        return
+    message = f"""
+🚨 **ATLAS ALERT**
 
-    endpoint = f"{SUPABASE_URL}/rest/v1/notifications"
+**{note['alert_level']}**
+**{brand}**
+{title}
 
-    message = (
-        f"{opp['alert_level']} ATLAS ALERT | "
-        f"{opp['brand']} | "
-        f"{opp['item_name']} | "
-        f"Score: {opp.get('confidence_score')} | "
-        f"Action: {opp.get('recommended_action')}"
-    )
+━━━━━━━━━━━━━━
 
-    payload = {
-        "opportunity_id": opp["id"],
-        "alert_level": opp["alert_level"],
-        "message": message,
-        "sent": False,
-    }
+**Atlas Score:** {score}/100
+**Action:** {action}
 
-    r = requests.post(endpoint, json=payload, headers=headers())
-    print(f"Notification created: {r.status_code}")
+**Why Atlas flagged it:**
+{reason}
+
+**Official Source:**
+{source}
+
+**eBay Sold Comps:**
+{ebay}
+
+━━━━━━━━━━━━━━
+"""
+
+    r = requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
+    print(r.status_code)
     print(r.text)
+    r.raise_for_status()
+    return True
+
+
+def mark_sent(notification_id):
+    r = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/notifications",
+        headers=headers(),
+        params={"id": f"eq.{notification_id}"},
+        json={"sent": True},
+    )
     r.raise_for_status()
 
 
 def main():
-    opportunities = get_opportunities_to_alert()
+    notes = get_unsent_notifications()
+    print(f"Unsent notifications: {len(notes)}")
 
-    print(f"Opportunities needing alerts: {len(opportunities)}")
-
-    for opp in opportunities:
-        print(f"Checking alert: {opp['brand']} | {opp['item_name']}")
-        create_notification(opp)
+    for note in notes:
+        sent = send_to_discord(note)
+        if sent:
+            mark_sent(note["id"])
+            print(f"Sent notification {note['id']}")
 
 
 if __name__ == "__main__":
