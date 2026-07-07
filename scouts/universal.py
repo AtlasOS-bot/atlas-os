@@ -7,7 +7,34 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
 
+def supabase_headers():
+    return {
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+
+def drop_already_exists(url):
+    endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
+    params = {
+        "url": f"eq.{url}",
+        "select": "id",
+        "limit": "1",
+    }
+
+    r = requests.get(endpoint, headers=supabase_headers(), params=params)
+    r.raise_for_status()
+
+    return len(r.json()) > 0
+
+
 def save_to_supabase(brand, title, url, raw_text):
+    if drop_already_exists(url):
+        print(f"Duplicate skipped: {title}")
+        return
+
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
 
     payload = {
@@ -18,14 +45,7 @@ def save_to_supabase(brand, title, url, raw_text):
         "already_scored": False,
     }
 
-    headers = {
-        "apikey": SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=representation",
-    }
-
-    r = requests.post(endpoint, json=payload, headers=headers)
+    r = requests.post(endpoint, json=payload, headers=supabase_headers())
     print(f"{brand}: {r.status_code}")
     print(r.text)
     r.raise_for_status()
