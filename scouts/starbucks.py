@@ -1,12 +1,11 @@
 import os
-import re
 import requests
 from bs4 import BeautifulSoup
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-STARBUCKS_URL = "https://about.starbucks.com/"
+SOURCE_URL = "https://www.prnewswire.com/news/starbucks-coffee-company/"
 
 
 def save_to_supabase(title, url, raw_text):
@@ -33,35 +32,36 @@ def save_to_supabase(title, url, raw_text):
     r.raise_for_status()
 
 
-def clean_text(text):
-    return re.sub(r"\s+", " ", text).strip()
-
-
 def main():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; AtlasOS/1.0; personal research)"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 AtlasOS personal research scout"}
 
-    response = requests.get(STARBUCKS_URL, headers=headers, timeout=20)
+    response = requests.get(SOURCE_URL, headers=headers, timeout=20)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    headlines = []
-    for tag in soup.find_all(["h1", "h2", "h3"]):
-        text = clean_text(tag.get_text(" ", strip=True))
-        if len(text) > 20 and "Starbucks" in text:
-            headlines.append(text)
+    title = None
+    link = SOURCE_URL
 
-    if headlines:
-        title = headlines[0]
-    else:
-        title = "Starbucks Homepage Scout Check"
+    for a in soup.find_all("a", href=True):
+        text = " ".join(a.get_text(" ", strip=True).split())
+        href = a["href"]
+
+        if len(text) > 25 and "Starbucks" in text:
+            title = text
+            if href.startswith("/"):
+                link = "https://www.prnewswire.com" + href
+            else:
+                link = href
+            break
+
+    if not title:
+        title = "Starbucks PR Newswire Scout Check"
 
     save_to_supabase(
         title=title,
-        url=STARBUCKS_URL,
-        raw_text="Collected from official Starbucks homepage by Atlas Python Scout.",
+        url=link,
+        raw_text="Collected from PR Newswire Starbucks company page by Atlas Python Scout.",
     )
 
 
