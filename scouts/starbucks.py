@@ -1,60 +1,63 @@
 import os
 import requests
-from bs4 import BeautifulSoup
-
+import xml.etree.ElementTree as ET
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-STARBUCKS_URL = "https://about.starbucks.com/sitemap.xml"
+RSS_URL = "https://stories.starbucks.com/feed/"
 
 
-def save_to_supabase(title: str, url: str, raw_text: str) -> None:
+def save_to_supabase(title, url):
     endpoint = f"{SUPABASE_URL}/rest/v1/raw_drops"
 
     payload = {
         "brand": "Starbucks",
         "title": title,
         "url": url,
-        "raw_text": raw_text,
-        "already_scored": False,
+        "raw_text": "Collected by Atlas Python Scout",
+        "already_scored": False
     }
 
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation",
+        "Prefer": "return=representation"
     }
 
-    response = requests.post(endpoint, json=payload, headers=headers)
-    print(response.status_code)
-    print(response.text)
+    r = requests.post(endpoint, json=payload, headers=headers)
+
+    print(r.status_code)
+    print(r.text)
+
+    r.raise_for_status()
+
+
+def main():
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 AtlasOS"
+    }
+
+    response = requests.get(RSS_URL, headers=headers, timeout=20)
     response.raise_for_status()
 
+    root = ET.fromstring(response.content)
 
-def main() -> None:
-    response = requests.get(
-    STARBUCKS_URL,
-    timeout=20,
-    headers={"User-Agent": "AtlasOS personal research scout"}
-)
-    response.raise_for_status()
+    item = root.find("./channel/item")
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    if item is None:
+        print("No stories found.")
+        return
 
-    title_tag = soup.find(["h1", "h2", "h3"])
+    title = item.findtext("title")
+    link = item.findtext("link")
 
-    if title_tag:
-        title = title_tag.get_text(strip=True)
-    else:
-        title = "Starbucks News Blog Check"
+    print(title)
+    print(link)
 
-    save_to_supabase(
-        title=title,
-        url=STARBUCKS_URL,
-        raw_text="Detected from official Starbucks News Blog using Python Scout.",
-    )
+    save_to_supabase(title, link)
 
 
 if __name__ == "__main__":
