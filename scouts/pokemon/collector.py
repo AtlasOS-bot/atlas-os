@@ -1,69 +1,88 @@
 import requests
 from bs4 import BeautifulSoup
 
+from scouts.base.atlas_scout import AtlasScout
 from .parser import parse_pokemon_item
-from .scorer import score_pokemon_item
 
 SOURCE_URL = "https://www.pokemon.com/us/news"
 
 
-def collect_pokemon_center_items():
-    print("Pokémon Scout running...")
+class PokemonScout(AtlasScout):
 
-    response = requests.get(
-        SOURCE_URL,
-        headers={"User-Agent": "AtlasOS Pokemon Scout"},
-        timeout=20,
-    )
-    response.raise_for_status()
+    brand = "Pokemon"
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    category = "pokemon"
 
-    items = []
+    def collect(self):
 
-    for link in soup.find_all("a", href=True):
-        title = " ".join(link.get_text(" ", strip=True).split())
-        url = link["href"]
+        response = requests.get(
+            SOURCE_URL,
+            headers={
+                "User-Agent": "AtlasOS Pokemon Scout"
+            },
+            timeout=20,
+        )
 
-        if len(title) < 20:
-            continue
+        response.raise_for_status()
 
-        text = title.lower()
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        if not any(
-            term in text
-            for term in [
-                "pokemon center",
-                "pokémon center",
-                "exclusive",
-                "elite trainer box",
-                "etb",
-                "booster",
-                "promo",
-                "collection",
-            ]
-        ):
-            continue
+        items = []
 
-        if url.startswith("/"):
-            url = "https://www.pokemon.com" + url
+        for link in soup.find_all("a", href=True):
 
-        item = parse_pokemon_item(title=title, url=url)
-        intelligence = score_pokemon_item(item)
+            title = " ".join(
+                link.get_text(" ", strip=True).split()
+            )
 
-        item["intelligence"] = intelligence
-        items.append(item)
+            if len(title) < 20:
+                continue
 
-    return items
+            text = title.lower()
+
+            if not any(
+                term in text
+                for term in [
+                    "pokemon center",
+                    "pokémon center",
+                    "exclusive",
+                    "promo",
+                    "elite trainer box",
+                    "booster",
+                    "collection",
+                ]
+            ):
+                continue
+
+            url = link["href"]
+
+            if url.startswith("/"):
+                url = "https://www.pokemon.com" + url
+
+            item = parse_pokemon_item(
+                title=title,
+                url=url,
+            )
+
+            items.append(item)
+
+        return items
+
+    def run(self):
+
+        print("Pokémon Scout running...")
+
+        items = self.collect()
+
+        print(f"Found {len(items)} Pokémon items")
+
+        for item in items:
+            self.save_opportunity(item)
+
+
+def main():
+    PokemonScout().run()
 
 
 if __name__ == "__main__":
-    results = collect_pokemon_center_items()
-
-    print(f"Found {len(results)} Pokémon items")
-
-    for item in results[:5]:
-        print("-----")
-        print(item["title"])
-        print(item["url"])
-        print(item["intelligence"])
+    main()
