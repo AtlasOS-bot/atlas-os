@@ -1,5 +1,6 @@
 from market import ALL_MARKET_PROVIDERS
 from market.aggregator import MarketAggregator
+from market.cache import market_cache
 from market.router import MarketRouter
 
 
@@ -7,6 +8,17 @@ class MarketEngine:
 
     @staticmethod
     def research(item):
+
+        cache_key = (
+            item.get("brand", "")
+            + "|"
+            + item.get("title", "")
+        )
+
+        cached = market_cache.get(cache_key)
+
+        if cached is not None:
+            return cached
 
         selected_providers = MarketRouter.providers_for(
             item,
@@ -24,11 +36,13 @@ class MarketEngine:
                 provider.search(item)
             )
 
-        summary = MarketAggregator.aggregate(
-            provider_results
-        )
-
-        return {
-            "summary": summary,
+        result = {
+            "summary": MarketAggregator.aggregate(
+                provider_results
+            ),
             "providers": provider_results,
         }
+
+        market_cache.set(cache_key, result)
+
+        return result
