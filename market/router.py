@@ -6,21 +6,43 @@ class MarketRouter:
         title = (item.get("title") or "").lower()
         brand = (item.get("brand") or "").lower()
 
-        provider_map = {provider.name: provider for provider in providers}
+        provider_map = {
+            provider.name: provider
+            for provider in providers
+        }
 
-        if category in ["pokemon", "tcg"] or "pokemon" in brand or "pokémon" in title:
-            return [
+        selected = []
+
+        # Always check for manually supplied market figures first.
+        if provider_map.get("manual"):
+            selected.append(provider_map["manual"])
+
+        if (
+            category in ["pokemon", "tcg"]
+            or "pokemon" in brand
+            or "pokémon" in title
+        ):
+            selected.extend([
                 provider_map.get("tcgplayer"),
                 provider_map.get("pricecharting"),
                 provider_map.get("ebay"),
-            ]
+            ])
 
-        if category == "nike" or "nike" in brand or "snkrs" in title:
-            return [
+        elif (
+            category == "nike"
+            or "nike" in brand
+            or "snkrs" in title
+        ):
+            selected.extend([
                 provider_map.get("stockx"),
                 provider_map.get("ebay"),
-            ]
+            ])
+
+        else:
+            selected.append(provider_map.get("ebay"))
 
         return [
-            provider_map.get("ebay"),
+            provider
+            for provider in selected
+            if provider is not None
         ]
