@@ -2,33 +2,63 @@ class MissionBrief:
 
     @staticmethod
     def generate(item, analysis, roi=None):
+        roi = roi if roi is not None else analysis.get("roi")
+        market = analysis.get("market", {})
+        market_summary = market.get("summary", {})
 
-        lines = []
+        lines = [
+            "=" * 44,
+            "ATLAS MISSION BRIEF",
+            "=" * 44,
+            f"Item: {item.get('title', 'Unknown item')}",
+            f"Brand: {item.get('brand', 'Unknown brand')}",
+            "",
+            f"Decision: {analysis.get('decision', 'WATCH')}",
+            f"Confidence: {analysis.get('confidence', 'UNKNOWN')}",
+            f"Opportunity: {analysis.get('opportunity', 'UNKNOWN')}",
+            f"Urgency: {analysis.get('urgency', 'UNKNOWN')}",
+        ]
 
-        lines.append("=" * 40)
-        lines.append("ATLAS MISSION BRIEF")
-        lines.append("=" * 40)
+        average_price = market_summary.get("average_price")
+        sold_count = market_summary.get("sold_count", 0)
+        market_confidence = market_summary.get(
+            "confidence",
+            "UNKNOWN",
+        )
 
-        lines.append(f"Item: {item.get('title')}")
-        lines.append(f"Brand: {item.get('brand')}")
-        lines.append("")
+        if average_price is not None:
+            lines.extend([
+                "",
+                "MARKET INTELLIGENCE",
+                f"Average Market Price: ${average_price:.2f}",
+                f"Sold Listings: {sold_count}",
+                f"Market Confidence: {market_confidence}",
+            ])
 
-        lines.append(f"Decision: {analysis['decision']}")
-        lines.append(f"Confidence: {analysis['confidence']}")
+        if roi is not None:
+            lines.extend([
+                "",
+                "ROI ANALYSIS",
+                f"Retail: ${roi['retail_price']:.2f}",
+                f"Average Sold: ${roi['average_sold_price']:.2f}",
+                f"Estimated Fees: ${roi['fees']:.2f}",
+                f"Estimated Shipping: ${roi['shipping']:.2f}",
+                f"Net Revenue: ${roi['net_revenue']:.2f}",
+                f"Estimated Profit: ${roi['profit']:.2f}",
+                f"Estimated ROI: {roi['roi']:.2f}%",
+            ])
 
-        if roi:
+        lines.extend([
+            "",
+            "WHY ATLAS FLAGGED IT",
+        ])
 
-            lines.append("")
-            lines.append("ROI Analysis")
-            lines.append(f"Retail: ${roi['retail_price']:.2f}")
-            lines.append(f"Average Sold: ${roi['average_sold_price']:.2f}")
-            lines.append(f"Profit: ${roi['profit']:.2f}")
-            lines.append(f"ROI: {roi['roi']:.2f}%")
+        for reason in analysis.get("reasons", []):
+            lines.append(f"• {reason}")
 
-        lines.append("")
-        lines.append("Reasons")
-
-        for reason in analysis["reasons"]:
-            lines.append(f" • {reason}")
+        lines.extend([
+            "",
+            "=" * 44,
+        ])
 
         return "\n".join(lines)

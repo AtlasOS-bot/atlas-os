@@ -3,11 +3,12 @@ import importlib
 from brain.explanation_engine import explain
 from decision.decision_engine import decide
 from market.engine import MarketEngine
-from reasoning.evidence import build_evidence
+from market.roi import ROIEngine
 from reasoning.confidence import calculate_confidence
+from reasoning.evidence import build_evidence
 from reasoning.opportunity import calculate_opportunity
-from reasoning.urgency import calculate_urgency
 from reasoning.resale import estimate_resale
+from reasoning.urgency import calculate_urgency
 
 
 def reason(item, category="general"):
@@ -28,7 +29,29 @@ def reason(item, category="general"):
 
     score = calculate_score(evidence)
 
-    watch_risk = any(e["type"] == "watch_risk" for e in evidence)
+    watch_risk = any(
+        evidence_item["type"] in {"watch_risk", "restock", "reprint"}
+        for evidence_item in evidence
+    )
+
+    confidence = calculate_confidence(evidence)
+    opportunity = calculate_opportunity(score, confidence)
+    urgency = calculate_urgency(item)
+
+    market = MarketEngine.research(item)
+    market_summary = market.get("summary", {})
+
+    retail_price = item.get("retail_price")
+    average_sold_price = market_summary.get("average_price")
+
+    roi = ROIEngine.calculate(
+        retail_price=retail_price,
+        average_sold_price=average_sold_price,
+        shipping_cost=item.get("shipping_cost"),
+        fee_rate=item.get("fee_rate"),
+    )
+
+    resale = estimate_resale(item)
 
     decision = decide(
         score=score,
@@ -36,13 +59,17 @@ def reason(item, category="general"):
         pattern_count=len(patterns),
     )
 
-    confidence = calculate_confidence(evidence)
-    opportunity = calculate_opportunity(score, confidence)
-    urgency = calculate_urgency(item)
-    market = MarketEngine.research(item)
-    resale = estimate_resale(item)
+    reasons = [
+        evidence_item["reason"]
+        for evidence_item in evidence
+    ]
 
-    reasons = [e["reason"] for e in evidence]
+    if roi is not None:
+        reasons.append(
+            f"Estimated profit is ${roi['profit']:.2f} "
+            f"with an estimated ROI of {roi['roi']:.2f}%."
+        )
+
     reasons.append(decision["reason"])
 
     result = {
@@ -52,10 +79,14 @@ def reason(item, category="general"):
         "opportunity": opportunity,
         "urgency": urgency,
         "market": market,
+        "roi": roi,
         "resale": resale,
         "evidence": evidence,
         "reasons": reasons,
-        "competition_note": "Competition may be high, but Atlas treats high competition as context, not a score penalty.",
+        "competition_note": (
+            "Competition may be high, but Atlas treats high "
+            "competition as context, not a score penalty."
+        ),
     }
 
     result["explanation"] = explain(item, result)
@@ -65,7 +96,10 @@ def reason(item, category="general"):
 
 def calculate_score(evidence):
     base_score = 40
-    evidence_score = sum(e.get("weight", 0) for e in evidence)
+    evidence_score = sum(
+        evidence_item.get("weight", 0)
+        for evidence_item in evidence
+    )
 
     return max(0, min(base_score + evidence_score, 100))
 
@@ -73,34 +107,40 @@ def calculate_score(evidence):
 def load_knowledge(category):
     try:
         module = importlib.import_module(f"knowledge.{category}")
-        attr = f"{category.upper()}_KNOWLEDGE"
-        return getattr(module, attr, {})
-    except Exception:
+        attribute = f"{category.upper()}_KNOWLEDGE"
+        return getattr(module, attribute, {})
+    except (ImportError, AttributeError):
         return {}
 
 
 def load_memory(category):
     try:
-        module = importlib.import_module(f"memory.{category}_memory")
-        func = getattr(module, f"{category}_memory")
-        return func()
-    except Exception:
+        module = importlib.import_module(
+            f"memory.{category}_memory"
+        )
+        function = getattr(module, f"{category}_memory")
+        return function()
+    except (ImportError, AttributeError):
         return {"total_items_seen": 0}
 
 
 def load_patterns(category):
     try:
-        module = importlib.import_module(f"patterns.{category}_patterns")
-        func = getattr(module, "detect_patterns")
-        return func()
-    except Exception:
+        module = importlib.import_module(
+            f"patterns.{category}_patterns"
+        )
+        function = getattr(module, "detect_patterns")
+        return function()
+    except (ImportError, AttributeError):
         return []
 
 
 def load_rules(category):
     try:
-        module = importlib.import_module(f"scouts.{category}.rules")
-        attr = f"{category.upper()}_RULES"
-        return getattr(module, attr, {})
-    except Exception:
+        module = importlib.import_module(
+            f"scouts.{category}.rules"
+        )
+        attribute = f"{category.upper()}_RULES"
+        return getattr(module, attribute, {})
+    except (ImportError, AttributeError):
         return {}
