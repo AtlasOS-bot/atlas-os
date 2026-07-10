@@ -12,7 +12,7 @@ from reasoning.urgency import calculate_urgency
 
 
 def reason(item, category="general"):
-    category = category.lower().replace("-", "_").replace(" ", "_")
+    category = normalize_category(category)
 
     knowledge = load_knowledge(category)
     memory = load_memory(category)
@@ -30,7 +30,11 @@ def reason(item, category="general"):
     score = calculate_score(evidence)
 
     watch_risk = any(
-        evidence_item["type"] in {"watch_risk", "restock", "reprint"}
+        evidence_item.get("type") in {
+            "watch_risk",
+            "restock",
+            "reprint",
+        }
         for evidence_item in evidence
     )
 
@@ -51,13 +55,14 @@ def reason(item, category="general"):
         fee_rate=item.get("fee_rate"),
     )
 
-    resale = estimate_resale(item)
-
     decision = decide(
         score=score,
         reprint_risk=watch_risk,
         pattern_count=len(patterns),
+        roi=roi,
     )
+
+    resale = estimate_resale(item)
 
     reasons = [
         evidence_item["reason"]
@@ -66,8 +71,13 @@ def reason(item, category="general"):
 
     if roi is not None:
         reasons.append(
-            f"Estimated profit is ${roi['profit']:.2f} "
-            f"with an estimated ROI of {roi['roi']:.2f}%."
+            f"Estimated profit is ${roi['profit']:.2f} with an "
+            f"estimated ROI of {roi['roi']:.2f}%."
+        )
+    else:
+        reasons.append(
+            "Atlas does not yet have both retail price and market-price "
+            "data, so ROI could not be calculated."
         )
 
     reasons.append(decision["reason"])
@@ -75,7 +85,8 @@ def reason(item, category="general"):
     result = {
         "score": score,
         "decision": decision["action"],
-        "confidence": confidence,
+        "confidence": decision["confidence"],
+        "signal_confidence": confidence,
         "opportunity": opportunity,
         "urgency": urgency,
         "market": market,
@@ -84,8 +95,8 @@ def reason(item, category="general"):
         "evidence": evidence,
         "reasons": reasons,
         "competition_note": (
-            "Competition may be high, but Atlas treats high "
-            "competition as context, not a score penalty."
+            "Competition may be high, but Atlas treats high competition "
+            "as context, not a score penalty."
         ),
     }
 
@@ -94,19 +105,34 @@ def reason(item, category="general"):
     return result
 
 
+def normalize_category(category):
+    return (
+        (category or "general")
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+
 def calculate_score(evidence):
     base_score = 40
+
     evidence_score = sum(
         evidence_item.get("weight", 0)
         for evidence_item in evidence
     )
 
-    return max(0, min(base_score + evidence_score, 100))
+    return max(
+        0,
+        min(base_score + evidence_score, 100),
+    )
 
 
 def load_knowledge(category):
     try:
-        module = importlib.import_module(f"knowledge.{category}")
+        module = importlib.import_module(
+            f"knowledge.{category}"
+        )
         attribute = f"{category.upper()}_KNOWLEDGE"
         return getattr(module, attribute, {})
     except (ImportError, AttributeError):
@@ -118,10 +144,15 @@ def load_memory(category):
         module = importlib.import_module(
             f"memory.{category}_memory"
         )
-        function = getattr(module, f"{category}_memory")
+        function = getattr(
+            module,
+            f"{category}_memory",
+        )
         return function()
     except (ImportError, AttributeError):
-        return {"total_items_seen": 0}
+        return {
+            "total_items_seen": 0,
+        }
 
 
 def load_patterns(category):
@@ -129,7 +160,10 @@ def load_patterns(category):
         module = importlib.import_module(
             f"patterns.{category}_patterns"
         )
-        function = getattr(module, "detect_patterns")
+        function = getattr(
+            module,
+            "detect_patterns",
+        )
         return function()
     except (ImportError, AttributeError):
         return []
