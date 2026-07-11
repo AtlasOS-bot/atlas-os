@@ -4,6 +4,7 @@ from brain.explanation_engine import explain
 from decision.decision_engine import decide
 from market.engine import MarketEngine
 from market.roi import ROIEngine
+from patterns.engine import PatternEngine
 from reasoning.confidence import calculate_confidence
 from reasoning.evidence import build_evidence
 from reasoning.opportunity import calculate_opportunity
@@ -16,16 +17,28 @@ def reason(item, category="general"):
 
     knowledge = load_knowledge(category)
     memory = load_memory(category)
-    patterns = load_patterns(category)
+    legacy_patterns = load_patterns(category)
     rules = load_rules(category)
+
+    pattern_analysis = PatternEngine.analyze(item)
+    pattern_matches = pattern_analysis.get("matches", [])
+    pattern_summary = pattern_analysis.get("summary", {})
 
     evidence = build_evidence(
         item=item,
         knowledge=knowledge,
         rules=rules,
         memory=memory,
-        patterns=patterns,
+        patterns=legacy_patterns,
     )
+
+    if pattern_matches:
+        evidence.append({
+            "type": "historical_pattern_match",
+            "signal": "historical_pattern_match",
+            "weight": pattern_evidence_weight(pattern_summary),
+            "reason": build_pattern_reason(pattern_analysis),
+        })
 
     score = calculate_score(evidence)
 
@@ -38,8 +51,11 @@ def reason(item, category="general"):
         for evidence_item in evidence
     )
 
-    confidence = calculate_confidence(evidence)
-    opportunity = calculate_opportunity(score, confidence)
+    signal_confidence = calculate_confidence(evidence)
+    opportunity = calculate_opportunity(
+        score,
+        signal_confidence,
+    )
     urgency = calculate_urgency(item)
 
     market = MarketEngine.research(item)
@@ -58,7 +74,7 @@ def reason(item, category="general"):
     decision = decide(
         score=score,
         reprint_risk=watch_risk,
-        pattern_count=len(patterns),
+        pattern_count=len(pattern_matches),
         roi=roi,
     )
 
@@ -86,12 +102,13 @@ def reason(item, category="general"):
         "score": score,
         "decision": decision["action"],
         "confidence": decision["confidence"],
-        "signal_confidence": confidence,
+        "signal_confidence": signal_confidence,
         "opportunity": opportunity,
         "urgency": urgency,
         "market": market,
         "roi": roi,
         "resale": resale,
+        "patterns": pattern_analysis,
         "evidence": evidence,
         "reasons": reasons,
         "competition_note": (
@@ -103,6 +120,38 @@ def reason(item, category="general"):
     result["explanation"] = explain(item, result)
 
     return result
+
+
+def pattern_evidence_weight(pattern_summary):
+    confidence = pattern_summary.get("confidence", "LOW")
+
+    weights = {
+        "VERY HIGH": 12,
+        "HIGH": 9,
+        "MEDIUM": 6,
+        "LOW": 3,
+    }
+
+    return weights.get(confidence, 3)
+
+
+def build_pattern_reason(pattern_analysis):
+    summary = pattern_analysis.get("summary", {})
+    matches = pattern_analysis.get("matches", [])
+
+    names = [
+        match.get("name", "unknown pattern")
+        for match in matches[:3]
+    ]
+
+    pattern_names = ", ".join(names)
+
+    return (
+        f"Atlas matched {len(matches)} historical pattern(s): "
+        f"{pattern_names}. Historical pattern score: "
+        f"{summary.get('pattern_score', 0):.2f}; "
+        f"confidence: {summary.get('confidence', 'LOW')}."
+    )
 
 
 def normalize_category(category):
