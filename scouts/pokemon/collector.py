@@ -41,17 +41,67 @@ class PokemonScout(AtlasScout):
             print(
                 f"Analyzing: {item['title']}"
             )
+
             print(
                 "Product type:",
                 item["product_type"],
             )
+
             print(
                 "Collector tier:",
                 item["collector_tier"],
             )
+
+            print(
+                "Popularity:",
+                (
+                    f"{item['popularity_score']}/100 "
+                    f"({item['popularity_level']})"
+                ),
+            )
+
+            print(
+                "Collector score:",
+                f"{item['collector_score']}/100",
+            )
+
+            print(
+                "Collector level:",
+                item["collector_level"],
+            )
+
+            print(
+                "Flip score:",
+                f"{item['flip_score']}/100",
+            )
+
+            print(
+                "Hold score:",
+                f"{item['hold_score']}/100",
+            )
+
+            print(
+                "Sleeper score:",
+                f"{item['sleeper_score']}/100",
+            )
+
+            print(
+                "Best strategy:",
+                item["best_strategy"][
+                    "strategy"
+                ],
+            )
+
+            print(
+                "Hold profile:",
+                item["hold_profile"],
+            )
+
             print(
                 "Release urgency:",
-                item["release_urgency"]["level"],
+                item["release_urgency"][
+                    "level"
+                ],
             )
 
             saved = self.save_opportunity(
