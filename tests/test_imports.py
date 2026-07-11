@@ -26,6 +26,14 @@ MODULES = [
     "scouts.nike.parser",
     "scouts.nike.rules",
     "scouts.nike.scorer",
+    "scouts.pokemon.sources",
+"scouts.pokemon.internet_scout",
+"scouts.pokemon.structured_data",
+"popularity.models",
+"popularity.pokemon",
+"popularity.engine",
+"scouts.pokemon.classifier",
+"scouts.pokemon.enrichment",
 ]
 
 

@@ -1,87 +1,84 @@
-import requests
-from bs4 import BeautifulSoup
-
 from scouts.base.atlas_scout import AtlasScout
-from .parser import parse_pokemon_item
-
-SOURCE_URL = "https://www.pokemon.com/us/news"
+from scouts.pokemon.enrichment import (
+    enrich_pokemon_item,
+)
+from scouts.pokemon.internet_scout import (
+    collect_official_pokemon_items,
+)
 
 
 class PokemonScout(AtlasScout):
-
     brand = "Pokemon"
-
     category = "pokemon"
 
     def collect(self):
-
-        response = requests.get(
-            SOURCE_URL,
-            headers={
-                "User-Agent": "AtlasOS Pokemon Scout"
-            },
-            timeout=20,
+        raw_items = (
+            collect_official_pokemon_items()
         )
 
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        items = []
-
-        for link in soup.find_all("a", href=True):
-
-            title = " ".join(
-                link.get_text(" ", strip=True).split()
-            )
-
-            if len(title) < 20:
-                continue
-
-            text = title.lower()
-
-            if not any(
-                term in text
-                for term in [
-                    "pokemon center",
-                    "pokémon center",
-                    "exclusive",
-                    "promo",
-                    "elite trainer box",
-                    "booster",
-                    "collection",
-                ]
-            ):
-                continue
-
-            url = link["href"]
-
-            if url.startswith("/"):
-                url = "https://www.pokemon.com" + url
-
-            item = parse_pokemon_item(
-                title=title,
-                url=url,
-            )
-
-            items.append(item)
-
-        return items
+        return [
+            enrich_pokemon_item(item)
+            for item in raw_items
+        ]
 
     def run(self):
-
-        print("Pokémon Scout running...")
+        print(
+            "Pokémon Internet Scout running..."
+        )
 
         items = self.collect()
 
-        print(f"Found {len(items)} Pokémon items")
+        print(
+            f"Found {len(items)} unique "
+            "Pokémon candidates"
+        )
 
-        for item in items:
-            self.save_opportunity(item)
+        saved_count = 0
+        duplicate_count = 0
+
+        for item in items[:50]:
+            print("")
+            print(
+                f"Analyzing: {item['title']}"
+            )
+            print(
+                "Product type:",
+                item["product_type"],
+            )
+            print(
+                "Collector tier:",
+                item["collector_tier"],
+            )
+            print(
+                "Release urgency:",
+                item["release_urgency"]["level"],
+            )
+
+            saved = self.save_opportunity(
+                item
+            )
+
+            if saved:
+                saved_count += 1
+            else:
+                duplicate_count += 1
+
+        print("")
+        print("Pokémon Scout Summary")
+        print("---------------------")
+        print(f"Candidates: {len(items)}")
+        print(f"Saved: {saved_count}")
+        print(
+            f"Duplicates skipped: "
+            f"{duplicate_count}"
+        )
+
+        return items
 
 
 def main():
-    PokemonScout().run()
+    scout = PokemonScout()
+    scout.run()
 
 
 if __name__ == "__main__":
