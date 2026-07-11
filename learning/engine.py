@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from learning.models import LearningRecord
+from learning.statistics import LearningStatistics
 from learning.storage import JsonLearningStore
 
 
@@ -25,6 +26,39 @@ class LearningEngine:
 
         return record.to_dict()
 
+    def summarize(self):
+        records = self.store.all()
+
+        return LearningStatistics.summarize(
+            records
+        )
+
+    def summary_for(self, category, brand):
+        group_key = f"{category}:{brand}"
+
+        summaries = self.summarize()
+
+        return summaries.get(
+            group_key,
+            {
+                "total_records": 0,
+                "records_with_roi": 0,
+                "records_with_profit": 0,
+                "average_roi": None,
+                "average_profit": None,
+                "average_market_price": None,
+                "average_score": 0,
+                "profitable_count": 0,
+                "profitable_rate": None,
+                "buy_count": 0,
+                "strong_watch_count": 0,
+                "watch_count": 0,
+                "skip_count": 0,
+                "buy_rate": 0,
+                "confidence": "LOW",
+            },
+        )
+
     @staticmethod
     def build_record(item, analysis):
         roi = analysis.get("roi") or {}
@@ -39,12 +73,18 @@ class LearningEngine:
         evidence = analysis.get("evidence") or []
 
         pattern_names = [
-            match.get("name", "unknown_pattern")
+            match.get(
+                "name",
+                "unknown_pattern",
+            )
             for match in pattern_matches
         ]
 
         evidence_types = [
-            evidence_item.get("type", "unknown")
+            evidence_item.get(
+                "type",
+                "unknown",
+            )
             for evidence_item in evidence
         ]
 
