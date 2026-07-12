@@ -14,6 +14,12 @@ from scouts.pokemon.enrichment import (
 from scouts.pokemon.internet_scout import (
     collect_official_pokemon_items,
 )
+from scouts.pokemon.release_brief import (
+    PokemonReleaseBrief,
+)
+from scouts.pokemon.release_store import (
+    PokemonReleaseStore,
+)
 from scouts.pokemon.state_tracker import (
     PokemonStateTracker,
 )
@@ -32,6 +38,10 @@ class PokemonScout(AtlasScout):
 
         self.alert_store = (
             PokemonAlertStore()
+        )
+
+        self.release_store = (
+            PokemonReleaseStore()
         )
 
     def collect(self):
@@ -54,6 +64,12 @@ class PokemonScout(AtlasScout):
         print(
             f"Found {len(items)} unique "
             "Pokémon candidates"
+        )
+
+        release_calendar = (
+            self.release_store.save(
+                items
+            )
         )
 
         saved_count = 0
@@ -127,17 +143,25 @@ class PokemonScout(AtlasScout):
             )
 
             print(
-                "Alert created:",
+                "Product type:",
+                item["product_type"],
+            )
+
+            print(
+                "Release date:",
                 (
-                    "YES"
-                    if saved_alert
-                    else "NO"
+                    item.get(
+                        "release_date"
+                    )
+                    or "Unknown"
                 ),
             )
 
             print(
-                "Product type:",
-                item["product_type"],
+                "Release urgency:",
+                item["release_urgency"][
+                    "level"
+                ],
             )
 
             print(
@@ -217,12 +241,24 @@ class PokemonScout(AtlasScout):
             f"Active alerts: "
             f"{len(active_alerts)}"
         )
+        print(
+            f"Release calendar entries: "
+            f"{release_calendar['count']}"
+        )
 
         print("")
         print(
             PokemonAlertBrief.generate(
                 active_alerts,
                 limit=10,
+            )
+        )
+
+        print("")
+        print(
+            PokemonReleaseBrief.generate(
+                items=items,
+                limit=15,
             )
         )
 
