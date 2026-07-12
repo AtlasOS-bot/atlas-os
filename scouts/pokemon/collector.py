@@ -1,4 +1,6 @@
-from scouts.base.atlas_scout import AtlasScout
+from scouts.base.atlas_scout import (
+    AtlasScout,
+)
 from scouts.pokemon.alert_brief import (
     PokemonAlertBrief,
 )
@@ -123,8 +125,154 @@ class PokemonScout(AtlasScout):
                 alert_count += 1
 
             print("")
+            print("=" * 60)
             print(
                 f"Analyzing: {item['title']}"
+            )
+            print("=" * 60)
+
+            print(
+                "Product summary:",
+                item["product_summary"],
+            )
+
+            print(
+                "Product type:",
+                item["product_type"],
+            )
+
+            print(
+                "Set or collection:",
+                (
+                    item.get("set_name")
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "SKU:",
+                (
+                    item.get("sku")
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Retail price:",
+                format_price(item),
+            )
+
+            print(
+                "Availability:",
+                (
+                    item.get(
+                        "availability"
+                    )
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Release date:",
+                (
+                    item.get(
+                        "release_date"
+                    )
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Booster packs:",
+                (
+                    item.get(
+                        "pack_count"
+                    )
+                    if item.get(
+                        "pack_count"
+                    ) is not None
+                    else "Unknown"
+                ),
+            )
+
+            print(
+                "Promo cards:",
+                (
+                    item.get(
+                        "promo_card_count"
+                    )
+                    if item.get(
+                        "promo_card_count"
+                    ) is not None
+                    else "Unknown"
+                ),
+            )
+
+            accessories = item.get(
+                "included_accessories"
+            ) or []
+
+            print(
+                "Included accessories:",
+                (
+                    ", ".join(
+                        accessories
+                    )
+                    if accessories
+                    else "Unknown"
+                ),
+            )
+
+            print(
+                "Image:",
+                (
+                    item.get(
+                        "image_url"
+                    )
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Official confirmations:",
+                item.get(
+                    "confirmation_count",
+                    1,
+                ),
+            )
+
+            print(
+                "Sources:",
+                (
+                    ", ".join(
+                        item.get(
+                            "sources",
+                            [],
+                        )
+                    )
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Detail completeness:",
+                (
+                    f"{item['detail_completeness_score']}/100 "
+                    f"({item['detail_completeness_level']})"
+                ),
+            )
+
+            missing = item.get(
+                "missing_detail_fields"
+            ) or []
+
+            print(
+                "Missing details:",
+                (
+                    ", ".join(missing)
+                    if missing
+                    else "None"
+                ),
             )
 
             print(
@@ -140,21 +288,6 @@ class PokemonScout(AtlasScout):
             print(
                 "Alert action:",
                 alert["action"],
-            )
-
-            print(
-                "Product type:",
-                item["product_type"],
-            )
-
-            print(
-                "Release date:",
-                (
-                    item.get(
-                        "release_date"
-                    )
-                    or "Unknown"
-                ),
             )
 
             print(
@@ -263,6 +396,36 @@ class PokemonScout(AtlasScout):
         )
 
         return items
+
+
+def format_price(item):
+    price = item.get(
+        "retail_price"
+    )
+
+    currency = (
+        item.get("currency")
+        or "USD"
+    )
+
+    if price is None:
+        return "Unknown"
+
+    try:
+        price_text = (
+            f"{float(price):.2f}"
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return str(price)
+
+    if currency == "USD":
+        return f"${price_text}"
+
+    return f"{price_text} {currency}"
 
 
 def main():

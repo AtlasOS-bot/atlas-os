@@ -46,6 +46,10 @@ MODULES = [
 "scouts.pokemon.alert_store",
 "scouts.pokemon.alert_queue",
 "scouts.pokemon.alert_brief",
+"scouts.pokemon.release_calendar",
+"scouts.pokemon.release_brief",
+"scouts.pokemon.release_store",
+"scouts.pokemon.product_details",
 ]
 
 

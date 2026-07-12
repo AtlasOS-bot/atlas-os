@@ -1,4 +1,6 @@
-from popularity.engine import PopularityEngine
+from popularity.engine import (
+    PopularityEngine,
+)
 from scouts.pokemon.classifier import (
     calculate_release_urgency,
     classify_pokemon_product,
@@ -9,36 +11,59 @@ from scouts.pokemon.collector_intelligence import (
 from scouts.pokemon.investment_intelligence import (
     calculate_investment_intelligence,
 )
+from scouts.pokemon.product_details import (
+    extract_product_details,
+)
 
 
 def enrich_pokemon_item(item):
     enriched = dict(item)
 
-    classification = classify_pokemon_product(
-        enriched
+    classification = (
+        classify_pokemon_product(
+            enriched
+        )
     )
 
     enriched.update(
         classification
     )
 
-    release_urgency = calculate_release_urgency(
-        enriched
+    product_details = (
+        extract_product_details(
+            enriched
+        )
+    )
+
+    enriched.update(
+        product_details
+    )
+
+    release_urgency = (
+        calculate_release_urgency(
+            enriched
+        )
     )
 
     enriched["release_urgency"] = (
         release_urgency
     )
 
-    popularity = PopularityEngine.analyze(
-        item=enriched,
-        category="pokemon",
+    popularity = (
+        PopularityEngine.analyze(
+            item=enriched,
+            category="pokemon",
+        )
     )
 
-    enriched["popularity"] = popularity
+    enriched["popularity"] = (
+        popularity
+    )
+
     enriched["popularity_score"] = (
         popularity["score"]
     )
+
     enriched["popularity_level"] = (
         popularity["level"]
     )
@@ -54,11 +79,15 @@ def enrich_pokemon_item(item):
     )
 
     enriched["collector_score"] = (
-        collector_intelligence["score"]
+        collector_intelligence[
+            "score"
+        ]
     )
 
     enriched["collector_level"] = (
-        collector_intelligence["level"]
+        collector_intelligence[
+            "level"
+        ]
     )
 
     enriched["hold_profile"] = (
