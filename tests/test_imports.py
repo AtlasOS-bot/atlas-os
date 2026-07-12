@@ -44,6 +44,8 @@ MODULES = [
 "scouts.pokemon.state_tracker",
 "scouts.pokemon.alert_intelligence",
 "scouts.pokemon.alert_store",
+"scouts.pokemon.alert_queue",
+"scouts.pokemon.alert_brief",
 ]
 
 

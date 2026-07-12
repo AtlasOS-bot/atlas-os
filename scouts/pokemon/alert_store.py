@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from scouts.pokemon.identity import (
+    canonical_product_key,
+)
+
 
 DEFAULT_ALERT_PATH = Path(
     os.environ.get(
@@ -31,8 +35,27 @@ class PokemonAlertStore:
 
         records = self.all()
 
+        product_key = (
+            canonical_product_key(item)
+            or item.get("url")
+            or item.get("title", "").lower()
+        )
+
+        event = alert.get(
+            "event",
+            "UNKNOWN",
+        )
+
+        if self.alert_exists(
+            records=records,
+            product_key=product_key,
+            event=event,
+        ):
+            return None
+
         record = {
             "alert_id": str(uuid4()),
+            "product_key": product_key,
             "created_at": datetime.now(
                 timezone.utc
             ).isoformat(),
@@ -42,7 +65,7 @@ class PokemonAlertStore:
             "product_type": item.get(
                 "product_type"
             ),
-            "event": alert.get("event"),
+            "event": event,
             "priority": alert.get(
                 "priority"
             ),
@@ -71,31 +94,44 @@ class PokemonAlertStore:
             "popularity_score": item.get(
                 "popularity_score"
             ),
+            "consensus_score": item.get(
+                "consensus_score"
+            ),
+            "release_urgency": (
+                item.get("release_urgency")
+                or {}
+            ).get("level"),
             "reasons": alert.get(
                 "reasons",
                 [],
             ),
+            "status": "NEW",
         }
 
         records.append(record)
 
-        self.path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        with self.path.open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                records,
-                file,
-                indent=2,
-                ensure_ascii=False,
-            )
+        self._save(records)
 
         return record
+
+    def alert_exists(
+        self,
+        records,
+        product_key,
+        event,
+    ):
+        return any(
+            record.get("product_key")
+            == product_key
+            and record.get("event")
+            == event
+            and record.get("status")
+            in {
+                "NEW",
+                "ACTIVE",
+            }
+            for record in records
+        )
 
     def all(self):
         if not self.path.exists():
@@ -119,3 +155,57 @@ class PokemonAlertStore:
             if isinstance(data, list)
             else []
         )
+
+    def active(self):
+        return [
+            record
+            for record in self.all()
+            if record.get("status")
+            in {
+                "NEW",
+                "ACTIVE",
+            }
+        ]
+
+    def mark_resolved(
+        self,
+        alert_id,
+    ):
+        records = self.all()
+        updated = False
+
+        for record in records:
+            if (
+                record.get("alert_id")
+                == alert_id
+            ):
+                record["status"] = "RESOLVED"
+                record["resolved_at"] = (
+                    datetime.now(
+                        timezone.utc
+                    ).isoformat()
+                )
+                updated = True
+                break
+
+        if updated:
+            self._save(records)
+
+        return updated
+
+    def _save(self, records):
+        self.path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        with self.path.open(
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(
+                records,
+                file,
+                indent=2,
+                ensure_ascii=False,
+            )

@@ -1,4 +1,7 @@
 from scouts.base.atlas_scout import AtlasScout
+from scouts.pokemon.alert_brief import (
+    PokemonAlertBrief,
+)
 from scouts.pokemon.alert_intelligence import (
     calculate_alert_intelligence,
 )
@@ -109,44 +112,8 @@ class PokemonScout(AtlasScout):
             )
 
             print(
-                "Product type:",
-                item["product_type"],
-            )
-
-            print(
-                "Official confirmations:",
-                item.get(
-                    "confirmation_count",
-                    1,
-                ),
-            )
-
-            print(
-                "Consensus score:",
-                (
-                    f"{item.get('consensus_score', 0)}/100 "
-                    f"({item.get('consensus_level', 'LOW')})"
-                ),
-            )
-
-            print(
                 "Product event:",
                 state_change["event"],
-            )
-
-            print(
-                "Event importance:",
-                state_change["importance"],
-            )
-
-            print(
-                "Event reason:",
-                state_change["reason"],
-            )
-
-            print(
-                "Alert score:",
-                f"{alert['score']}/100",
             )
 
             print(
@@ -169,6 +136,19 @@ class PokemonScout(AtlasScout):
             )
 
             print(
+                "Product type:",
+                item["product_type"],
+            )
+
+            print(
+                "Consensus score:",
+                (
+                    f"{item.get('consensus_score', 0)}/100 "
+                    f"({item.get('consensus_level', 'LOW')})"
+                ),
+            )
+
+            print(
                 "Popularity:",
                 (
                     f"{item['popularity_score']}/100 "
@@ -179,11 +159,6 @@ class PokemonScout(AtlasScout):
             print(
                 "Collector score:",
                 f"{item['collector_score']}/100",
-            )
-
-            print(
-                "Collector level:",
-                item["collector_level"],
             )
 
             print(
@@ -208,13 +183,6 @@ class PokemonScout(AtlasScout):
                 ],
             )
 
-            print(
-                "Release urgency:",
-                item["release_urgency"][
-                    "level"
-                ],
-            )
-
             saved = self.save_opportunity(
                 item
             )
@@ -223,6 +191,10 @@ class PokemonScout(AtlasScout):
                 saved_count += 1
             else:
                 duplicate_count += 1
+
+        active_alerts = (
+            self.alert_store.active()
+        )
 
         print("")
         print("Pokémon Scout Summary")
@@ -238,8 +210,20 @@ class PokemonScout(AtlasScout):
             f"{meaningful_change_count}"
         )
         print(
-            f"Alerts created: "
+            f"New alerts created: "
             f"{alert_count}"
+        )
+        print(
+            f"Active alerts: "
+            f"{len(active_alerts)}"
+        )
+
+        print("")
+        print(
+            PokemonAlertBrief.generate(
+                active_alerts,
+                limit=10,
+            )
         )
 
         return items
