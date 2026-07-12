@@ -5,11 +5,21 @@ from scouts.pokemon.enrichment import (
 from scouts.pokemon.internet_scout import (
     collect_official_pokemon_items,
 )
+from scouts.pokemon.state_tracker import (
+    PokemonStateTracker,
+)
 
 
 class PokemonScout(AtlasScout):
     brand = "Pokemon"
     category = "pokemon"
+
+    def __init__(self):
+        super().__init__()
+
+        self.state_tracker = (
+            PokemonStateTracker()
+        )
 
     def collect(self):
         raw_items = (
@@ -35,8 +45,33 @@ class PokemonScout(AtlasScout):
 
         saved_count = 0
         duplicate_count = 0
+        important_change_count = 0
 
         for item in items[:50]:
+            state_change = (
+                self.state_tracker.observe(
+                    item
+                )
+            )
+
+            item["state_change"] = (
+                state_change
+            )
+
+            item["state_event"] = (
+                state_change["event"]
+            )
+
+            item["state_importance"] = (
+                state_change["importance"]
+            )
+
+            if (
+                state_change["event"]
+                != "NO_CHANGE"
+            ):
+                important_change_count += 1
+
             print("")
             print(
                 f"Analyzing: {item['title']}"
@@ -45,6 +80,37 @@ class PokemonScout(AtlasScout):
             print(
                 "Product type:",
                 item["product_type"],
+            )
+
+            print(
+                "Official confirmations:",
+                item.get(
+                    "confirmation_count",
+                    1,
+                ),
+            )
+
+            print(
+                "Consensus score:",
+                (
+                    f"{item.get('consensus_score', 0)}/100 "
+                    f"({item.get('consensus_level', 'LOW')})"
+                ),
+            )
+
+            print(
+                "Product event:",
+                state_change["event"],
+            )
+
+            print(
+                "Event importance:",
+                state_change["importance"],
+            )
+
+            print(
+                "Event reason:",
+                state_change["reason"],
             )
 
             print(
@@ -121,6 +187,10 @@ class PokemonScout(AtlasScout):
         print(
             f"Duplicates skipped: "
             f"{duplicate_count}"
+        )
+        print(
+            f"Meaningful state changes: "
+            f"{important_change_count}"
         )
 
         return items

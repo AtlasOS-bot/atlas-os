@@ -4,6 +4,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from scouts.pokemon.consensus import build_consensus
 from scouts.pokemon.parser import parse_pokemon_item
 from scouts.pokemon.sources import POKEMON_SOURCES
 from scouts.pokemon.structured_data import (
@@ -287,9 +288,7 @@ def structured_candidate_to_item(
         ],
         "source_url": source["url"],
         "category": "pokemon",
-        "discovery_method": (
-            "structured_json"
-        ),
+        "discovery_method": "structured_json",
         "retail_price": candidate.get(
             "retail_price"
         ),
@@ -318,11 +317,9 @@ def extract_structured_items(
     html,
     source,
 ):
-    candidates = (
-        extract_structured_candidates(
-            html=html,
-            source=source,
-        )
+    candidates = extract_structured_candidates(
+        html=html,
+        source=source,
     )
 
     items = []
@@ -467,6 +464,17 @@ def collect_official_pokemon_items():
         ):
             time.sleep(1)
 
-    return deduplicate_items(
+    url_deduplicated = deduplicate_items(
         collected
     )
+
+    consensus_items = build_consensus(
+        url_deduplicated
+    )
+
+    print(
+        f"Cross-source consensus products: "
+        f"{len(consensus_items)}"
+    )
+
+    return consensus_items
