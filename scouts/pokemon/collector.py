@@ -1,4 +1,10 @@
 from scouts.base.atlas_scout import AtlasScout
+from scouts.pokemon.alert_intelligence import (
+    calculate_alert_intelligence,
+)
+from scouts.pokemon.alert_store import (
+    PokemonAlertStore,
+)
 from scouts.pokemon.enrichment import (
     enrich_pokemon_item,
 )
@@ -19,6 +25,10 @@ class PokemonScout(AtlasScout):
 
         self.state_tracker = (
             PokemonStateTracker()
+        )
+
+        self.alert_store = (
+            PokemonAlertStore()
         )
 
     def collect(self):
@@ -45,7 +55,8 @@ class PokemonScout(AtlasScout):
 
         saved_count = 0
         duplicate_count = 0
-        important_change_count = 0
+        meaningful_change_count = 0
+        alert_count = 0
 
         for item in items[:50]:
             state_change = (
@@ -66,11 +77,31 @@ class PokemonScout(AtlasScout):
                 state_change["importance"]
             )
 
+            alert = (
+                calculate_alert_intelligence(
+                    item
+                )
+            )
+
+            item["alert_intelligence"] = (
+                alert
+            )
+
+            saved_alert = (
+                self.alert_store.save(
+                    item=item,
+                    alert=alert,
+                )
+            )
+
             if (
                 state_change["event"]
                 != "NO_CHANGE"
             ):
-                important_change_count += 1
+                meaningful_change_count += 1
+
+            if saved_alert:
+                alert_count += 1
 
             print("")
             print(
@@ -114,8 +145,27 @@ class PokemonScout(AtlasScout):
             )
 
             print(
-                "Collector tier:",
-                item["collector_tier"],
+                "Alert score:",
+                f"{alert['score']}/100",
+            )
+
+            print(
+                "Alert priority:",
+                alert["priority"],
+            )
+
+            print(
+                "Alert action:",
+                alert["action"],
+            )
+
+            print(
+                "Alert created:",
+                (
+                    "YES"
+                    if saved_alert
+                    else "NO"
+                ),
             )
 
             print(
@@ -159,11 +209,6 @@ class PokemonScout(AtlasScout):
             )
 
             print(
-                "Hold profile:",
-                item["hold_profile"],
-            )
-
-            print(
                 "Release urgency:",
                 item["release_urgency"][
                     "level"
@@ -190,7 +235,11 @@ class PokemonScout(AtlasScout):
         )
         print(
             f"Meaningful state changes: "
-            f"{important_change_count}"
+            f"{meaningful_change_count}"
+        )
+        print(
+            f"Alerts created: "
+            f"{alert_count}"
         )
 
         return items

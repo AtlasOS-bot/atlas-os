@@ -34,6 +34,16 @@ MODULES = [
 "popularity.engine",
 "scouts.pokemon.classifier",
 "scouts.pokemon.enrichment",
+"scouts.pokemon.collector_intelligence",
+"signals.collector_value",
+"scouts.pokemon.investment_intelligence",
+"signals.investment_strategy",
+"scouts.pokemon.identity",
+"scouts.pokemon.consensus",
+"signals.source_consensus",
+"scouts.pokemon.state_tracker",
+"scouts.pokemon.alert_intelligence",
+"scouts.pokemon.alert_store",
 ]
 
 
