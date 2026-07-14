@@ -25,9 +25,14 @@ from scouts.pokemon.release_store import (
 from scouts.pokemon.state_tracker import (
     PokemonStateTracker,
 )
+from scouts.tcg.catalog_store import (
+    TcgCatalogStore,
+)
 
 
-class PokemonScout(AtlasScout):
+class PokemonScout(
+    AtlasScout
+):
     brand = "Pokemon"
     category = "pokemon"
 
@@ -44,6 +49,10 @@ class PokemonScout(AtlasScout):
 
         self.release_store = (
             PokemonReleaseStore()
+        )
+
+        self.catalog_store = (
+            TcgCatalogStore()
         )
 
     def collect(self):
@@ -125,26 +134,39 @@ class PokemonScout(AtlasScout):
                 alert_count += 1
 
             print("")
-            print("=" * 60)
+            print("=" * 64)
+
             print(
-                f"Analyzing: {item['title']}"
+                f"Analyzing: "
+                f"{item.get('title', 'Unknown')}"
             )
-            print("=" * 60)
+
+            print("=" * 64)
 
             print(
                 "Product summary:",
-                item["product_summary"],
+                (
+                    item.get(
+                        "product_summary"
+                    )
+                    or "Unknown"
+                ),
             )
 
             print(
                 "Product type:",
-                item["product_type"],
+                item.get(
+                    "product_type",
+                    "other",
+                ),
             )
 
             print(
                 "Set or collection:",
                 (
-                    item.get("set_name")
+                    item.get(
+                        "set_name"
+                    )
                     or "Unknown"
                 ),
             )
@@ -184,52 +206,35 @@ class PokemonScout(AtlasScout):
 
             print(
                 "Booster packs:",
-                (
+                display_value(
                     item.get(
                         "pack_count"
                     )
-                    if item.get(
-                        "pack_count"
-                    ) is not None
-                    else "Unknown"
                 ),
             )
 
             print(
                 "Promo cards:",
-                (
+                display_value(
                     item.get(
                         "promo_card_count"
                     )
-                    if item.get(
-                        "promo_card_count"
-                    ) is not None
-                    else "Unknown"
                 ),
             )
 
-            accessories = item.get(
-                "included_accessories"
-            ) or []
+            accessories = (
+                item.get(
+                    "included_accessories"
+                )
+                or []
+            )
 
             print(
                 "Included accessories:",
                 (
-                    ", ".join(
-                        accessories
-                    )
+                    ", ".join(accessories)
                     if accessories
                     else "Unknown"
-                ),
-            )
-
-            print(
-                "Image:",
-                (
-                    item.get(
-                        "image_url"
-                    )
-                    or "Unknown"
                 ),
             )
 
@@ -257,20 +262,25 @@ class PokemonScout(AtlasScout):
             print(
                 "Detail completeness:",
                 (
-                    f"{item['detail_completeness_score']}/100 "
-                    f"({item['detail_completeness_level']})"
+                    f"{item.get('detail_completeness_score', 0)}/100 "
+                    f"({item.get('detail_completeness_level', 'LIMITED')})"
                 ),
             )
 
-            missing = item.get(
-                "missing_detail_fields"
-            ) or []
+            missing_details = (
+                item.get(
+                    "missing_detail_fields"
+                )
+                or []
+            )
 
             print(
                 "Missing details:",
                 (
-                    ", ".join(missing)
-                    if missing
+                    ", ".join(
+                        missing_details
+                    )
+                    if missing_details
                     else "None"
                 ),
             )
@@ -278,6 +288,23 @@ class PokemonScout(AtlasScout):
             print(
                 "Product event:",
                 state_change["event"],
+            )
+
+            print(
+                "Event importance:",
+                state_change[
+                    "importance"
+                ],
+            )
+
+            print(
+                "Event reason:",
+                state_change["reason"],
+            )
+
+            print(
+                "Alert score:",
+                f"{alert['score']}/100",
             )
 
             print(
@@ -291,10 +318,25 @@ class PokemonScout(AtlasScout):
             )
 
             print(
+                "Alert created:",
+                (
+                    "YES"
+                    if saved_alert
+                    else "NO"
+                ),
+            )
+
+            print(
                 "Release urgency:",
-                item["release_urgency"][
-                    "level"
-                ],
+                (
+                    item.get(
+                        "release_urgency"
+                    )
+                    or {}
+                ).get(
+                    "level",
+                    "LOW",
+                ),
             )
 
             print(
@@ -308,78 +350,233 @@ class PokemonScout(AtlasScout):
             print(
                 "Popularity:",
                 (
-                    f"{item['popularity_score']}/100 "
-                    f"({item['popularity_level']})"
+                    f"{item.get('popularity_score', 0)}/100 "
+                    f"({item.get('popularity_level', 'LOW')})"
                 ),
             )
 
             print(
                 "Collector score:",
-                f"{item['collector_score']}/100",
+                (
+                    f"{item.get('collector_score', 0)}/100 "
+                    f"({item.get('collector_level', 'LOW')})"
+                ),
             )
 
             print(
                 "Flip score:",
-                f"{item['flip_score']}/100",
+                f"{item.get('flip_score', 0)}/100",
             )
 
             print(
                 "Hold score:",
-                f"{item['hold_score']}/100",
+                f"{item.get('hold_score', 0)}/100",
             )
 
             print(
                 "Sleeper score:",
-                f"{item['sleeper_score']}/100",
+                f"{item.get('sleeper_score', 0)}/100",
+            )
+
+            strategy = (
+                item.get(
+                    "best_strategy"
+                )
+                or {}
             )
 
             print(
                 "Best strategy:",
-                item["best_strategy"][
-                    "strategy"
-                ],
+                strategy.get(
+                    "strategy",
+                    "UNKNOWN",
+                ),
             )
 
-            saved = self.save_opportunity(
-                item
+            print(
+                "Strategy score:",
+                f"{strategy.get('score', 0)}/100",
+            )
+
+            print(
+                "Hold profile:",
+                (
+                    item.get(
+                        "hold_profile"
+                    )
+                    or "Unknown"
+                ),
+            )
+
+            print(
+                "Official URL:",
+                (
+                    item.get("url")
+                    or "Unknown"
+                ),
+            )
+
+            saved = (
+                self.save_opportunity(
+                    item
+                )
             )
 
             if saved:
                 saved_count += 1
+
             else:
                 duplicate_count += 1
+
+        catalog_result = (
+            self.catalog_store.upsert_many(
+                items
+            )
+        )
 
         active_alerts = (
             self.alert_store.active()
         )
 
+        top_pokemon = (
+            self.catalog_store.top(
+                limit=10,
+                category="pokemon",
+            )
+        )
+
         print("")
-        print("Pokémon Scout Summary")
+        print(
+            "POKÉMON SCOUT SUMMARY"
+        )
         print("---------------------")
-        print(f"Candidates: {len(items)}")
-        print(f"Saved: {saved_count}")
+
+        print(
+            f"Candidates: {len(items)}"
+        )
+
+        print(
+            f"Saved opportunities: "
+            f"{saved_count}"
+        )
+
         print(
             f"Duplicates skipped: "
             f"{duplicate_count}"
         )
+
         print(
             f"Meaningful state changes: "
             f"{meaningful_change_count}"
         )
+
         print(
             f"New alerts created: "
             f"{alert_count}"
         )
+
         print(
             f"Active alerts: "
             f"{len(active_alerts)}"
         )
+
         print(
             f"Release calendar entries: "
             f"{release_calendar['count']}"
         )
 
+        print(
+            "New catalog products:",
+            catalog_result[
+                "created_this_scan"
+            ],
+        )
+
+        print(
+            "Updated catalog products:",
+            catalog_result[
+                "updated_this_scan"
+            ],
+        )
+
+        print(
+            "Total TCG catalog products:",
+            catalog_result["count"],
+        )
+
         print("")
+        print(
+            "TOP POKÉMON OPPORTUNITIES"
+        )
+        print("-------------------------")
+
+        if not top_pokemon:
+            print(
+                "No Pokémon catalog "
+                "products available yet."
+            )
+
+        for position, product in enumerate(
+            top_pokemon,
+            start=1,
+        ):
+            product_strategy = (
+                product.get(
+                    "best_strategy"
+                )
+                or {}
+            )
+
+            print(
+                f"{position}. "
+                f"{product.get('title', 'Unknown')}"
+            )
+
+            print(
+                "   Strategy:",
+                product_strategy.get(
+                    "strategy",
+                    "UNKNOWN",
+                ),
+            )
+
+            print(
+                "   Strategy score:",
+                (
+                    f"{product_strategy.get('score', 0)}/100"
+                ),
+            )
+
+            print(
+                "   Collector:",
+                (
+                    f"{product.get('collector_score', 0)}/100"
+                ),
+            )
+
+            print(
+                "   Flip:",
+                (
+                    f"{product.get('flip_score', 0)}/100"
+                ),
+            )
+
+            print(
+                "   Hold:",
+                (
+                    f"{product.get('hold_score', 0)}/100"
+                ),
+            )
+
+            print(
+                "   Sleeper:",
+                (
+                    f"{product.get('sleeper_score', 0)}/100"
+                ),
+            )
+
+            print("")
+
         print(
             PokemonAlertBrief.generate(
                 active_alerts,
@@ -388,11 +585,22 @@ class PokemonScout(AtlasScout):
         )
 
         print("")
+
         print(
             PokemonReleaseBrief.generate(
                 items=items,
                 limit=15,
             )
+        )
+
+        print("")
+        print(
+            "Pokémon products added to:"
+        )
+
+        print(
+            ".atlas_data/"
+            "tcg_live_catalog.json"
         )
 
         return items
@@ -412,9 +620,7 @@ def format_price(item):
         return "Unknown"
 
     try:
-        price_text = (
-            f"{float(price):.2f}"
-        )
+        amount = float(price)
 
     except (
         TypeError,
@@ -423,9 +629,19 @@ def format_price(item):
         return str(price)
 
     if currency == "USD":
-        return f"${price_text}"
+        return f"${amount:.2f}"
 
-    return f"{price_text} {currency}"
+    return (
+        f"{amount:.2f} "
+        f"{currency}"
+    )
+
+
+def display_value(value):
+    if value is None:
+        return "Unknown"
+
+    return value
 
 
 def main():
