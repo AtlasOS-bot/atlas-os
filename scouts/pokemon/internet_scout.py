@@ -1,9 +1,12 @@
-import time
 from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 
+from acquisition.requests_retriever import (
+    REQUEST_HEADERS,
+    RequestsRetriever,
+)
+from acquisition.service import AcquisitionService
 from scouts.pokemon.consensus import build_consensus
 from scouts.pokemon.parser import parse_pokemon_item
 from scouts.pokemon.sources import POKEMON_SOURCES
@@ -11,19 +14,6 @@ from scouts.pokemon.structured_data import (
     extract_structured_candidates,
 )
 
-
-REQUEST_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/145.0 Safari/537.36"
-    ),
-    "Accept": (
-        "text/html,application/xhtml+xml,"
-        "application/xml;q=0.9,*/*;q=0.8"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-}
 
 PRIORITY_TERMS = [
     "pokemon center",
@@ -67,31 +57,8 @@ IGNORE_TERMS = [
 
 
 def fetch_source(source):
-    print(f"Scanning: {source['name']}")
-
-    try:
-        response = requests.get(
-            source["url"],
-            headers=REQUEST_HEADERS,
-            timeout=30,
-        )
-
-        response.raise_for_status()
-
-        print(
-            f"HTTP {response.status_code} | "
-            f"{len(response.text):,} characters"
-        )
-
-        return response.text
-
-    except requests.RequestException as error:
-        print(
-            f"Source failed: {source['name']} | "
-            f"{type(error).__name__}: {error}"
-        )
-
-        return None
+    raw_content = RequestsRetriever().fetch(source)
+    return raw_content.content
 
 
 def clean_title(value):
@@ -421,48 +388,17 @@ def deduplicate_items(items):
 
 
 def collect_official_pokemon_items():
-    collected = []
+    service = AcquisitionService(
+        retriever=RequestsRetriever()
+    )
 
-    for index, source in enumerate(
-        POKEMON_SOURCES
-    ):
-        html = fetch_source(source)
-
-        if html:
-            html_items = extract_html_items(
-                html=html,
-                source=source,
-            )
-
-            structured_items = (
-                extract_structured_items(
-                    html=html,
-                    source=source,
-                )
-            )
-
-            print(
-                f"HTML candidates: "
-                f"{len(html_items)}"
-            )
-
-            print(
-                f"Structured candidates: "
-                f"{len(structured_items)}"
-            )
-
-            collected.extend(
-                html_items
-            )
-
-            collected.extend(
-                structured_items
-            )
-
-        if index < (
-            len(POKEMON_SOURCES) - 1
-        ):
-            time.sleep(1)
+    collected = service.collect(
+        sources=POKEMON_SOURCES,
+        extractors={
+            "HTML candidates": extract_html_items,
+            "Structured candidates": extract_structured_items,
+        },
+    )
 
     url_deduplicated = deduplicate_items(
         collected
