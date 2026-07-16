@@ -28,6 +28,12 @@ from signals.restock import (
 from signals.shock_drop import (
     ShockDropSignal,
 )
+from signals.investment_strategy import (
+    InvestmentStrategySignal,
+)
+from signals.source_consensus import (
+    SourceConsensusSignal,
+)
 
 
 ALL_SIGNALS = [
@@ -41,4 +47,6 @@ ALL_SIGNALS = [
     HistoricalPatternSignal(),
     CollectorInterestSignal(),
     CollectorValueSignal(),
+    InvestmentStrategySignal(),
+    SourceConsensusSignal(),
 ]
