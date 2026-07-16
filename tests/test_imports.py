@@ -100,6 +100,7 @@ MODULES = [
     "signals.restock",
     "signals.shock_drop",
     "signals.source_consensus",
+    "scouts.one_piece.internet_scout",
 ]
 
 
