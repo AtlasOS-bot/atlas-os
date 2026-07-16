@@ -1,2 +1,20 @@
+# Python
 __pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual Environment
+.venv/
+
+# Atlas Runtime Data
 .atlas_data/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Environment Variables
+.env
+.env.local
