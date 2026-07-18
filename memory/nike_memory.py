@@ -1,32 +1,40 @@
 import os
 import requests
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+
+def supabase_credentials():
+    return (
+        os.environ.get("SUPABASE_URL"),
+        os.environ.get("SUPABASE_SERVICE_KEY"),
+    )
 
 
-def headers():
+def headers(service_key):
     return {
-        "apikey": SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
     }
 
 
 def nike_memory():
+    supabase_url, service_key = supabase_credentials()
 
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/opportunities",
-        headers=headers(),
-        params={
-            "brand": "eq.Nike",
-            "select": "item_name,atlas_reason",
-            "limit": "500",
-        },
-    )
+    if not supabase_url or not service_key:
+        opportunities = []
+    else:
+        r = requests.get(
+            f"{supabase_url}/rest/v1/opportunities",
+            headers=headers(service_key),
+            params={
+                "brand": "eq.Nike",
+                "select": "item_name,atlas_reason",
+                "limit": "500",
+            },
+        )
 
-    r.raise_for_status()
+        r.raise_for_status()
 
-    opportunities = r.json()
+        opportunities = r.json()
 
     memory = {
         "total_items_seen": len(opportunities),

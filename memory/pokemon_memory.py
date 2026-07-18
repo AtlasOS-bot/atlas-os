@@ -1,23 +1,31 @@
 import os
 import requests
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+
+def supabase_credentials():
+    return (
+        os.environ.get("SUPABASE_URL"),
+        os.environ.get("SUPABASE_SERVICE_KEY"),
+    )
 
 
-def headers():
+def headers(service_key):
     return {
-        "apikey": SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
         "Content-Type": "application/json",
     }
 
 
 def recent_pokemon_items(days=30):
+    supabase_url, service_key = supabase_credentials()
+
+    if not supabase_url or not service_key:
+        return []
 
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/opportunities",
-        headers=headers(),
+        f"{supabase_url}/rest/v1/opportunities",
+        headers=headers(service_key),
         params={
             "brand": "eq.Pokemon",
             "select": "*",
