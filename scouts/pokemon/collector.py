@@ -30,13 +30,32 @@ from scouts.tcg.catalog_store import (
 )
 
 
+EMPTY_RELEASE_CALENDAR = {
+    "generated_at": None,
+    "count": 0,
+    "releases": [],
+}
+
+EMPTY_CATALOG_RESULT = {
+    "generated_at": None,
+    "count": 0,
+    "created_this_scan": 0,
+    "updated_this_scan": 0,
+    "items": [],
+}
+
+
 class PokemonScout(
     AtlasScout
 ):
     brand = "Pokemon"
     category = "pokemon"
 
-    def __init__(self):
+    def __init__(
+        self,
+        collector=None,
+        enricher=None,
+    ):
         super().__init__()
 
         self.state_tracker = (
@@ -55,15 +74,46 @@ class PokemonScout(
             TcgCatalogStore()
         )
 
-    def collect(self):
-        raw_items = (
-            collect_official_pokemon_items()
+        self.collector = (
+            collector
+            or collect_official_pokemon_items
         )
 
-        return [
-            enrich_pokemon_item(item)
-            for item in raw_items
-        ]
+        self.enricher = (
+            enricher
+            or enrich_pokemon_item
+        )
+
+    def collect(self):
+        try:
+            raw_items = self.collector()
+
+        except Exception as error:
+            self._log_stage_failure(
+                stage="collection",
+                error=error,
+            )
+
+            raw_items = []
+
+        enriched_items = []
+
+        for raw_item in raw_items:
+            try:
+                enriched_items.append(
+                    self.enricher(raw_item)
+                )
+
+            except Exception as error:
+                self._log_stage_failure(
+                    stage="enrichment",
+                    error=error,
+                    identifier=self._item_title(
+                        raw_item
+                    ),
+                )
+
+        return enriched_items
 
     def run(self):
         print(
@@ -77,55 +127,124 @@ class PokemonScout(
             "Pokémon candidates"
         )
 
-        release_calendar = (
-            self.release_store.save(
-                items
+        try:
+            release_calendar = (
+                self.release_store.save(
+                    items
+                )
             )
-        )
+
+        except Exception as error:
+            self._log_stage_failure(
+                stage="release_calendar",
+                error=error,
+            )
+
+            release_calendar = dict(
+                EMPTY_RELEASE_CALENDAR
+            )
 
         saved_count = 0
         duplicate_count = 0
+        opportunity_failed_count = 0
         meaningful_change_count = 0
         alert_count = 0
+        failed_item_count = 0
 
         for item in items[:50]:
-            state_change = (
-                self.state_tracker.observe(
-                    item
+            if not isinstance(item, dict):
+                failed_item_count += 1
+
+                self._log_stage_failure(
+                    stage="item_processing",
+                    error=TypeError(
+                        "item is not a dict"
+                    ),
+                    identifier=self._item_title(
+                        item
+                    ),
                 )
-            )
 
-            item["state_change"] = (
-                state_change
-            )
+                continue
 
-            item["state_event"] = (
-                state_change["event"]
-            )
-
-            item["state_importance"] = (
-                state_change["importance"]
-            )
-
-            alert = (
-                calculate_alert_intelligence(
-                    item
+            try:
+                state_change = (
+                    self.state_tracker.observe(
+                        item
+                    )
                 )
-            )
 
-            item["alert_intelligence"] = (
-                alert
-            )
-
-            saved_alert = (
-                self.alert_store.save(
-                    item=item,
-                    alert=alert,
+            except Exception as error:
+                self._log_stage_failure(
+                    stage="state_tracking",
+                    error=error,
+                    identifier=self._item_title(
+                        item
+                    ),
                 )
-            )
+
+                state_change = None
+
+            if state_change is not None:
+                item["state_change"] = (
+                    state_change
+                )
+
+                item["state_event"] = (
+                    state_change["event"]
+                )
+
+                item["state_importance"] = (
+                    state_change["importance"]
+                )
+
+            try:
+                alert = (
+                    calculate_alert_intelligence(
+                        item
+                    )
+                )
+
+            except Exception as error:
+                self._log_stage_failure(
+                    stage="alert_scoring",
+                    error=error,
+                    identifier=self._item_title(
+                        item
+                    ),
+                )
+
+                alert = None
+
+            saved_alert = None
+
+            if alert is not None:
+                item["alert_intelligence"] = (
+                    alert
+                )
+
+                try:
+                    saved_alert = (
+                        self.alert_store.save(
+                            item=item,
+                            alert=alert,
+                        )
+                    )
+
+                except Exception as error:
+                    self._log_stage_failure(
+                        stage="alert_persistence",
+                        error=error,
+                        identifier=self._item_title(
+                            item
+                        ),
+                    )
+
+                    saved_alert = None
 
             if (
-                state_change["event"]
+                state_change
+                and state_change["event"]
                 != "NO_CHANGE"
             ):
                 meaningful_change_count += 1
@@ -287,34 +406,48 @@ class PokemonScout(
 
             print(
                 "Product event:",
-                state_change["event"],
+                (state_change or {}).get(
+                    "event",
+                    "UNKNOWN",
+                ),
             )
 
             print(
                 "Event importance:",
-                state_change[
-                    "importance"
-                ],
+                (state_change or {}).get(
+                    "importance",
+                    "UNKNOWN",
+                ),
             )
 
             print(
                 "Event reason:",
-                state_change["reason"],
+                (state_change or {}).get(
+                    "reason",
+                    "State tracking failed "
+                    "for this item.",
+                ),
             )
 
             print(
                 "Alert score:",
-                f"{alert['score']}/100",
+                f"{(alert or {}).get('score', 0)}/100",
             )
 
             print(
                 "Alert priority:",
-                alert["priority"],
+                (alert or {}).get(
+                    "priority",
+                    "UNKNOWN",
+                ),
             )
 
             print(
                 "Alert action:",
-                alert["action"],
+                (alert or {}).get(
+                    "action",
+                    "UNKNOWN",
+                ),
             )
 
             print(
@@ -416,34 +549,81 @@ class PokemonScout(
                 ),
             )
 
-            saved = (
-                self.save_opportunity(
-                    item
+            try:
+                saved = (
+                    self.save_opportunity(
+                        item
+                    )
+                )
+
+            except Exception as error:
+                self._log_stage_failure(
+                    stage=(
+                        "reasoning_and_"
+                        "opportunity_persistence"
+                    ),
+                    error=error,
+                    identifier=self._item_title(
+                        item
+                    ),
+                )
+
+                saved = None
+
+            if saved is True:
+                saved_count += 1
+
+            elif saved is False:
+                duplicate_count += 1
+
+            else:
+                opportunity_failed_count += 1
+
+        try:
+            catalog_result = (
+                self.catalog_store.upsert_many(
+                    items
                 )
             )
 
-            if saved:
-                saved_count += 1
-
-            else:
-                duplicate_count += 1
-
-        catalog_result = (
-            self.catalog_store.upsert_many(
-                items
+        except Exception as error:
+            self._log_stage_failure(
+                stage="catalog",
+                error=error,
             )
-        )
 
-        active_alerts = (
-            self.alert_store.active()
-        )
-
-        top_pokemon = (
-            self.catalog_store.top(
-                limit=10,
-                category="pokemon",
+            catalog_result = dict(
+                EMPTY_CATALOG_RESULT
             )
-        )
+
+        try:
+            active_alerts = (
+                self.alert_store.active()
+            )
+
+        except Exception as error:
+            self._log_stage_failure(
+                stage="alert_summary",
+                error=error,
+            )
+
+            active_alerts = []
+
+        try:
+            top_pokemon = (
+                self.catalog_store.top(
+                    limit=10,
+                    category="pokemon",
+                )
+            )
+
+        except Exception as error:
+            self._log_stage_failure(
+                stage="catalog_summary",
+                error=error,
+            )
+
+            top_pokemon = []
 
         print("")
         print(
@@ -502,6 +682,16 @@ class PokemonScout(
         print(
             "Total TCG catalog products:",
             catalog_result["count"],
+        )
+
+        print(
+            f"Items with processing failures: "
+            f"{failed_item_count}"
+        )
+
+        print(
+            f"Opportunities that failed to save: "
+            f"{opportunity_failed_count}"
         )
 
         print("")
@@ -604,6 +794,36 @@ class PokemonScout(
         )
 
         return items
+
+    @staticmethod
+    def _item_title(item):
+        if isinstance(item, dict):
+            return (
+                item.get("title")
+                or item.get("url")
+                or "Unknown item"
+            )
+
+        return "Unknown item"
+
+    @staticmethod
+    def _log_stage_failure(
+        stage,
+        error,
+        identifier=None,
+    ):
+        location = (
+            f" ({identifier})"
+            if identifier
+            else ""
+        )
+
+        print(
+            f"[PokemonScout] {stage} "
+            f"failed{location}: "
+            f"{type(error).__name__}: "
+            f"{error}"
+        )
 
 
 def format_price(item):
