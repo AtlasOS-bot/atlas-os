@@ -1,0 +1,54 @@
+name: Pokémon Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+concurrency:
+  group: pokemon-pipeline
+  cancel-in-progress: false
+
+jobs:
+  pokemon-scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore Pokémon pipeline state
+        uses: actions/cache/restore@v4
+        with:
+          path: .atlas_data
+          key: pokemon-state-${{ github.run_id }}
+          restore-keys: |
+            pokemon-state-
+
+      - name: Run Pokémon Scout
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -o pipefail
+          python -m scouts.pokemon.collector 2>&1 | tee pokemon-scout.log
+          if grep -q "\[PokemonScout\] collection failed" pokemon-scout.log; then
+            echo "::error::Pokémon collection stage failed entirely - see log above."
+            exit 1
+          fi
+
+      - name: Save Pokémon pipeline state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .atlas_data
+          key: pokemon-state-${{ github.run_id }}
