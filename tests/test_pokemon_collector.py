@@ -1388,3 +1388,75 @@ def test_one_detail_fetch_failure_does_not_block_other_products(
         "[PokemonDetailCollector] detail_fetch "
         "failed" in captured.out
     )
+
+
+def test_detail_collector_enabled_marker_prints_once_per_construction(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    make_scout(
+        monkeypatch,
+        tmp_path,
+        collector=lambda: [],
+        enricher=lambda item: item,
+    )
+
+    captured = capsys.readouterr()
+
+    assert (
+        captured.out.count(
+            "=== DETAIL COLLECTOR ENABLED ==="
+        )
+        == 1
+    )
+
+
+def test_detail_collection_start_marker_prints_before_first_product(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    def fake_collector():
+        return [
+            make_flappable_item("InStock")
+        ]
+
+    def fake_enricher(item):
+        return {
+            **item,
+            **basic_enriched_fields(),
+        }
+
+    scout = make_scout(
+        monkeypatch,
+        tmp_path,
+        collector=fake_collector,
+        enricher=fake_enricher,
+    )
+
+    monkeypatch.setattr(
+        scout,
+        "save_opportunity",
+        lambda item, event_key=None: True,
+    )
+
+    capsys.readouterr()  # discard construction output
+
+    scout.run()
+
+    captured = capsys.readouterr()
+
+    assert (
+        "=== DETAIL COLLECTION START ==="
+        in captured.out
+    )
+
+    start_index = captured.out.index(
+        "=== DETAIL COLLECTION START ==="
+    )
+    analyzing_index = captured.out.index(
+        "Analyzing:"
+    )
+
+    assert start_index < analyzing_index

@@ -94,6 +94,14 @@ class PokemonScout(
             or RequestsDetailPageRetriever()
         )
 
+        # TEMPORARY execution-audit marker (see the "not executing"
+        # investigation) - printed exactly once per PokemonScout
+        # instantiation. Remove once confirmed the running workflow
+        # is on the current code.
+        print(
+            "=== DETAIL COLLECTOR ENABLED ==="
+        )
+
     def collect(self):
         try:
             raw_items = self.collector()
@@ -107,6 +115,12 @@ class PokemonScout(
             raw_items = []
 
         enriched_items = []
+
+        # TEMPORARY execution-audit marker - printed exactly once per
+        # collect() call, before the first product is processed.
+        print(
+            "=== DETAIL COLLECTION START ==="
+        )
 
         for raw_item in raw_items:
             title = self._item_title(
