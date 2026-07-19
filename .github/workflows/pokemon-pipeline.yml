@@ -34,6 +34,23 @@ jobs:
           restore-keys: |
             pokemon-state-
 
+      - name: Verify runtime identity
+        run: |
+          echo "--- git rev-parse HEAD ---"
+          git rev-parse HEAD
+          echo "--- git log --oneline -1 ---"
+          git log --oneline -1
+          echo "--- python --version ---"
+          python --version
+          echo "--- pwd ---"
+          pwd
+          echo "--- ls scouts/pokemon ---"
+          ls scouts/pokemon
+          echo "--- grep -n 'DETAIL COLLECTOR ENABLED' scouts/pokemon/collector.py ---"
+          grep -n "DETAIL COLLECTOR ENABLED" scouts/pokemon/collector.py || echo "(no match found)"
+          echo "--- grep -n 'PokemonDetailCollector' scouts/pokemon/detail_collector.py ---"
+          grep -n "PokemonDetailCollector" scouts/pokemon/detail_collector.py || echo "(no match found)"
+
       - name: Run Pokémon Scout
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

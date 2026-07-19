@@ -146,6 +146,62 @@ def test_canonical_collector_module_is_importable_as_invoked_by_the_workflow():
     assert hasattr(PokemonScout, "run")
 
 
+def test_workflow_has_runtime_identity_verification_step_before_the_scout_runs():
+    """
+    Production logs showed zero output from the DETAIL COLLECTOR
+    ENABLED / DETAIL COLLECTION START / [PokemonDetailCollector]
+    markers even though those exact strings are present on
+    origin/main. This step proves, from inside the Actions runner
+    itself, exactly which commit/source tree is actually executing -
+    it must run before "Run Pokémon Scout", not after or in parallel.
+    """
+    content = read_workflow()
+
+    required_commands = [
+        "git rev-parse HEAD",
+        "git log --oneline -1",
+        "python --version",
+        "pwd",
+        "ls scouts/pokemon",
+        (
+            "grep -n \"DETAIL COLLECTOR ENABLED\" "
+            "scouts/pokemon/collector.py"
+        ),
+        (
+            "grep -n \"PokemonDetailCollector\" "
+            "scouts/pokemon/detail_collector.py"
+        ),
+    ]
+
+    for command in required_commands:
+        assert command in content, command
+
+    identity_step_index = content.index(
+        "Verify runtime identity"
+    )
+    run_scout_step_index = content.index(
+        "Run Pokémon Scout"
+    )
+
+    assert (
+        identity_step_index
+        < run_scout_step_index
+    )
+
+
+def test_runtime_identity_step_does_not_abort_on_missing_grep_match():
+    """
+    grep exits non-zero when it finds no match, and GitHub Actions'
+    default bash invocation for multi-line run: blocks uses -e (exit
+    on error). Both grep commands must be guarded so a genuine "the
+    marker is missing" result is reported rather than silently
+    aborting the rest of the diagnostic step.
+    """
+    content = read_workflow()
+
+    assert content.count("|| echo") >= 2
+
+
 def test_other_workflows_are_untouched_by_this_addition():
     workflows_dir = WORKFLOW_PATH.parent
 
