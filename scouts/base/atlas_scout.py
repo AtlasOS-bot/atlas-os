@@ -73,8 +73,40 @@ class AtlasScout:
 
         return bool(response.json())
 
-    def save_opportunity(self, item):
-        if self.opportunity_exists(item):
+    def event_key_exists(self, event_key):
+        response = requests.get(
+            (
+                f"{self.supabase_url}"
+                "/rest/v1/opportunities"
+            ),
+            headers=self.headers(),
+            params={
+                "event_key": (
+                    f"eq.{event_key}"
+                ),
+                "select": "id",
+                "limit": "1",
+            },
+            timeout=20,
+        )
+
+        response.raise_for_status()
+
+        return bool(response.json())
+
+    def save_opportunity(self, item, event_key=None):
+        if event_key is not None:
+            if self.event_key_exists(
+                event_key
+            ):
+                print(
+                    "Duplicate skipped "
+                    "(event already recorded):",
+                    item["title"],
+                )
+                return False
+
+        elif self.opportunity_exists(item):
             print(
                 "Duplicate skipped:",
                 item["title"],
@@ -102,6 +134,9 @@ class AtlasScout:
             "market_signal_status": "watch",
         }
 
+        if event_key is not None:
+            payload["event_key"] = event_key
+
         response = requests.post(
             (
                 f"{self.supabase_url}"
@@ -111,6 +146,22 @@ class AtlasScout:
             json=payload,
             timeout=20,
         )
+
+        if (
+            event_key is not None
+            and response.status_code == 409
+        ):
+            # A concurrent/near-concurrent writer already
+            # inserted a row with this exact event_key; the
+            # unique index rejected this one. That is the
+            # correct duplicate outcome, not a failure.
+            print(
+                "Duplicate skipped "
+                "(event already recorded, "
+                "race detected):",
+                item["title"],
+            )
+            return False
 
         response.raise_for_status()
 

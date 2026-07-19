@@ -106,6 +106,7 @@ class PokemonAlertStore:
                 [],
             ),
             "status": "NEW",
+            "opportunity_forwarded": False,
         }
 
         records.append(record)
@@ -185,6 +186,78 @@ class PokemonAlertStore:
                         timezone.utc
                     ).isoformat()
                 )
+                updated = True
+                break
+
+        if updated:
+            self._save(records)
+
+        return updated
+
+    def active_record_for(
+        self,
+        product_key,
+        event=None,
+    ):
+        for record in self.all():
+            if (
+                record.get("product_key")
+                != product_key
+            ):
+                continue
+
+            if record.get(
+                "status"
+            ) not in {
+                "NEW",
+                "ACTIVE",
+            }:
+                continue
+
+            if (
+                event is not None
+                and record.get("event")
+                != event
+            ):
+                continue
+
+            return record
+
+        return None
+
+    def is_opportunity_forwarded(
+        self,
+        alert_id,
+    ):
+        for record in self.all():
+            if (
+                record.get("alert_id")
+                == alert_id
+            ):
+                return bool(
+                    record.get(
+                        "opportunity_forwarded",
+                        False,
+                    )
+                )
+
+        return False
+
+    def mark_opportunity_forwarded(
+        self,
+        alert_id,
+    ):
+        records = self.all()
+        updated = False
+
+        for record in records:
+            if (
+                record.get("alert_id")
+                == alert_id
+            ):
+                record[
+                    "opportunity_forwarded"
+                ] = True
                 updated = True
                 break
 

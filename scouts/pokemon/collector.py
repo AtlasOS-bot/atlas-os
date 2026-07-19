@@ -147,6 +147,7 @@ class PokemonScout(
         saved_count = 0
         duplicate_count = 0
         opportunity_failed_count = 0
+        not_eligible_count = 0
         meaningful_change_count = 0
         alert_count = 0
         failed_item_count = 0
@@ -251,6 +252,13 @@ class PokemonScout(
 
             if saved_alert:
                 alert_count += 1
+
+            eligible_alert_record = (
+                self._resolve_eligible_alert_record(
+                    state_change=state_change,
+                    saved_alert=saved_alert,
+                )
+            )
 
             print("")
             print("=" * 64)
@@ -549,35 +557,68 @@ class PokemonScout(
                 ),
             )
 
-            try:
-                saved = (
-                    self.save_opportunity(
-                        item
+            if eligible_alert_record is None:
+                not_eligible_count += 1
+
+            else:
+                event_key = (
+                    self._build_event_key(
+                        eligible_alert_record
                     )
                 )
 
-            except Exception as error:
-                self._log_stage_failure(
-                    stage=(
-                        "reasoning_and_"
-                        "opportunity_persistence"
-                    ),
-                    error=error,
-                    identifier=self._item_title(
-                        item
-                    ),
-                )
+                try:
+                    saved = (
+                        self.save_opportunity(
+                            item,
+                            event_key=event_key,
+                        )
+                    )
 
-                saved = None
+                except Exception as error:
+                    self._log_stage_failure(
+                        stage=(
+                            "reasoning_and_"
+                            "opportunity_persistence"
+                        ),
+                        error=error,
+                        identifier=self._item_title(
+                            item
+                        ),
+                    )
 
-            if saved is True:
-                saved_count += 1
+                    saved = None
 
-            elif saved is False:
-                duplicate_count += 1
+                if saved is True:
+                    saved_count += 1
 
-            else:
-                opportunity_failed_count += 1
+                    self._mark_opportunity_forwarded_safe(
+                        alert_id=eligible_alert_record[
+                            "alert_id"
+                        ],
+                        item=item,
+                    )
+
+                elif saved is False:
+                    duplicate_count += 1
+
+                    # event_key is unique per genuine
+                    # transition, so a False result here
+                    # proves this exact event was already
+                    # successfully persisted (by this
+                    # process or an earlier/concurrent one)
+                    # - safe to mark forwarded, and this
+                    # self-heals a local flag that failed to
+                    # persist after a prior successful save.
+                    self._mark_opportunity_forwarded_safe(
+                        alert_id=eligible_alert_record[
+                            "alert_id"
+                        ],
+                        item=item,
+                    )
+
+                else:
+                    opportunity_failed_count += 1
 
         try:
             catalog_result = (
@@ -694,6 +735,13 @@ class PokemonScout(
             f"{opportunity_failed_count}"
         )
 
+        print(
+            f"Opportunities not eligible to "
+            f"forward (already forwarded or no "
+            f"active alert event): "
+            f"{not_eligible_count}"
+        )
+
         print("")
         print(
             "TOP POKÉMON OPPORTUNITIES"
@@ -794,6 +842,67 @@ class PokemonScout(
         )
 
         return items
+
+    def _resolve_eligible_alert_record(
+        self,
+        state_change,
+        saved_alert,
+    ):
+        if saved_alert is not None:
+            return saved_alert
+
+        product_key = (
+            state_change or {}
+        ).get("product_key")
+
+        if not product_key:
+            return None
+
+        record = (
+            self.alert_store.active_record_for(
+                product_key
+            )
+        )
+
+        if record is None:
+            return None
+
+        if self.alert_store.is_opportunity_forwarded(
+            record.get("alert_id")
+        ):
+            return None
+
+        return record
+
+    def _build_event_key(self, alert_record):
+        return (
+            f"{self.category}:"
+            f"{alert_record['product_key']}:"
+            f"{alert_record['event']}:"
+            f"{alert_record['alert_id']}"
+        )
+
+    def _mark_opportunity_forwarded_safe(
+        self,
+        alert_id,
+        item,
+    ):
+        try:
+            self.alert_store.mark_opportunity_forwarded(
+                alert_id
+            )
+
+        except Exception as error:
+            self._log_stage_failure(
+                stage=(
+                    "opportunity_"
+                    "forward_marking"
+                ),
+                error=error,
+                identifier=self._item_title(
+                    item
+                ),
+            )
 
     @staticmethod
     def _item_title(item):
