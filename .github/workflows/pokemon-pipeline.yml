@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .atlas_data
-          key: pokemon-state-${{ github.run_id }}
+          key: pokemon-state-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             pokemon-state-
 
@@ -51,4 +51,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .atlas_data
-          key: pokemon-state-${{ github.run_id }}
+          key: pokemon-state-${{ github.run_id }}-${{ github.run_attempt }}

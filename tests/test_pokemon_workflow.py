@@ -86,6 +86,49 @@ def test_workflow_persists_atlas_data_across_runs():
     assert ".atlas_data" in content
 
 
+def test_cache_key_includes_run_attempt_not_just_run_id():
+    """
+    Regression guard: github.run_id alone is stable across job
+    re-runs (only github.run_attempt increments on a re-run), so a
+    cache key of `pokemon-state-${{ github.run_id }}` collides with
+    itself on any re-run, producing:
+    "Unable to reserve cache with key ..., another job may be
+    creating this cache." Both the restore and save steps must key
+    on run_id + run_attempt so every actual execution attempt gets a
+    genuinely fresh, never-before-used cache key.
+    """
+    content = read_workflow()
+
+    expected_key = (
+        "pokemon-state-${{ github.run_id }}"
+        "-${{ github.run_attempt }}"
+    )
+
+    assert content.count(expected_key) == 2
+
+    # The bare run_id-only key (the buggy version) must not remain
+    # anywhere in the file.
+    assert (
+        "key: pokemon-state-${{ github.run_id }}\n"
+        not in content
+    )
+
+
+def test_restore_keys_prefix_still_matches_the_new_key_format():
+    """
+    restore-keys uses a plain string prefix match, so it must remain
+    a strict prefix of the new run_id-run_attempt key format in
+    order to keep finding the most recent previous cache.
+    """
+    content = read_workflow()
+
+    assert "restore-keys: |\n            pokemon-state-\n" in content
+    assert (
+        "pokemon-state-${{ github.run_id }}"
+        "-${{ github.run_attempt }}"
+    ).startswith("pokemon-state-")
+
+
 def test_canonical_collector_module_is_importable_as_invoked_by_the_workflow():
     """
     Proves the exact command the workflow runs
