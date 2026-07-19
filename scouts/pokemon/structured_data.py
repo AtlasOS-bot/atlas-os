@@ -264,6 +264,10 @@ def object_to_candidate(data, source):
             or data.get("productID")
             or data.get("mpn")
         ),
+        "product_id": (
+            data.get("productID")
+            or data.get("mpn")
+        ),
         "image_url": normalize_image(
             data.get("image"),
             source["base_url"],

@@ -10,6 +10,10 @@ from scouts.pokemon.alert_intelligence import (
 from scouts.pokemon.alert_store import (
     PokemonAlertStore,
 )
+from scouts.pokemon.detail_collector import (
+    RequestsDetailPageRetriever,
+    collect_pokemon_product_detail,
+)
 from scouts.pokemon.enrichment import (
     enrich_pokemon_item,
 )
@@ -55,6 +59,7 @@ class PokemonScout(
         self,
         collector=None,
         enricher=None,
+        detail_retriever=None,
     ):
         super().__init__()
 
@@ -84,6 +89,11 @@ class PokemonScout(
             or enrich_pokemon_item
         )
 
+        self.detail_retriever = (
+            detail_retriever
+            or RequestsDetailPageRetriever()
+        )
+
     def collect(self):
         try:
             raw_items = self.collector()
@@ -99,18 +109,39 @@ class PokemonScout(
         enriched_items = []
 
         for raw_item in raw_items:
+            title = self._item_title(
+                raw_item
+            )
+
+            try:
+                detailed_item = (
+                    collect_pokemon_product_detail(
+                        raw_item,
+                        retriever=self.detail_retriever,
+                    )
+                )
+
+            except Exception as error:
+                self._log_stage_failure(
+                    stage="detail_collection",
+                    error=error,
+                    identifier=title,
+                )
+
+                detailed_item = raw_item
+
             try:
                 enriched_items.append(
-                    self.enricher(raw_item)
+                    self.enricher(
+                        detailed_item
+                    )
                 )
 
             except Exception as error:
                 self._log_stage_failure(
                     stage="enrichment",
                     error=error,
-                    identifier=self._item_title(
-                        raw_item
-                    ),
+                    identifier=title,
                 )
 
         return enriched_items

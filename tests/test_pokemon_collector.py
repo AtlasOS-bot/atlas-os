@@ -4,6 +4,9 @@ from scouts.pokemon.alert_store import (
 from scouts.pokemon.collector import (
     PokemonScout,
 )
+from scouts.pokemon.detail_collector import (
+    RequestsDetailPageRetriever,
+)
 from scouts.pokemon.enrichment import (
     enrich_pokemon_item,
 )
@@ -21,11 +24,26 @@ from scouts.tcg.catalog_store import (
 )
 
 
+class NullDetailRetriever:
+    """
+    A detail-page retriever that never performs real network I/O.
+    Used as the default in tests so that adding detail collection to
+    PokemonScout does not make every existing collector test attempt
+    a live HTTP request. Returning None from fetch() means
+    collect_pokemon_product_detail() takes its normal
+    "fetch_failed" -> preserve-original-item path.
+    """
+
+    def fetch(self, url):
+        return None
+
+
 def make_scout(
     monkeypatch,
     tmp_path,
     collector=None,
     enricher=None,
+    detail_retriever=None,
 ):
     monkeypatch.setenv(
         "SUPABASE_URL",
@@ -39,6 +57,10 @@ def make_scout(
     scout = PokemonScout(
         collector=collector,
         enricher=enricher,
+        detail_retriever=(
+            detail_retriever
+            or NullDetailRetriever()
+        ),
     )
 
     scout.state_tracker = PokemonStateTracker(
@@ -635,6 +657,10 @@ def test_default_construction_uses_default_collector_and_enricher(
         scout.catalog_store,
         TcgCatalogStore,
     )
+    assert isinstance(
+        scout.detail_retriever,
+        RequestsDetailPageRetriever,
+    )
 
 
 def make_flappable_item(availability):
@@ -1188,4 +1214,177 @@ def test_duplicate_event_key_result_marks_local_record_forwarded(
     assert len(alerts) == 1
     assert (
         alerts[0]["opportunity_forwarded"] is True
+    )
+
+
+class FakeDetailRetriever:
+    """
+    Maps URL -> HTML (or an Exception to raise), used to test that
+    PokemonScout.collect() wires detail collection into the per-item
+    fault-isolation loop correctly.
+    """
+
+    def __init__(self, responses):
+        self.responses = responses
+
+    def fetch(self, url):
+        response = self.responses.get(url)
+
+        if isinstance(response, Exception):
+            raise response
+
+        return response
+
+
+STRUCTURED_DETAIL_PAGE = """
+<html><head>
+<script type="application/ld+json">
+{
+    "@type": "Product",
+    "name": "Detail Page Product",
+    "sku": "DETAIL-SKU-1",
+    "offers": {
+        "price": "44.99",
+        "priceCurrency": "USD",
+        "availability": "https://schema.org/InStock"
+    }
+}
+</script>
+</head><body></body></html>
+"""
+
+
+def test_detail_collection_enriches_item_before_state_tracking(
+    monkeypatch,
+    tmp_path,
+):
+    item_url = (
+        "https://www.pokemoncenter.com/"
+        "product/detail-page-item"
+    )
+
+    def fake_collector():
+        return [{
+            "title": "Detail Page Product",
+            "url": item_url,
+            "sku": None,
+        }]
+
+    def fake_enricher(item):
+        return {
+            **item,
+            **basic_enriched_fields(),
+        }
+
+    scout = make_scout(
+        monkeypatch,
+        tmp_path,
+        collector=fake_collector,
+        enricher=fake_enricher,
+        detail_retriever=FakeDetailRetriever({
+            item_url: STRUCTURED_DETAIL_PAGE,
+        }),
+    )
+
+    monkeypatch.setattr(
+        scout,
+        "save_opportunity",
+        lambda item, event_key=None: True,
+    )
+
+    items = scout.run()
+
+    assert len(items) == 1
+    assert items[0]["sku"] == "DETAIL-SKU-1"
+    assert items[0]["retail_price"] == 44.99
+    assert items[0]["availability"] == "InStock"
+
+    # The detail-enriched availability must have actually reached
+    # state_tracker.py's snapshot, proving detail collection runs
+    # before state tracking, not after.
+    states = scout.state_tracker._load()
+    snapshot = next(iter(states.values()))
+    assert snapshot["retail_price"] == 44.99
+
+
+def test_one_detail_fetch_failure_does_not_block_other_products(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    ok_url = (
+        "https://www.pokemoncenter.com/"
+        "product/works-fine"
+    )
+    failing_url = (
+        "https://www.pokemoncenter.com/"
+        "product/network-blip"
+    )
+
+    def fake_collector():
+        return [
+            {
+                "title": "Network Blip Item",
+                "url": failing_url,
+            },
+            {
+                "title": "Works Fine Item",
+                "url": ok_url,
+            },
+        ]
+
+    def fake_enricher(item):
+        return {
+            **item,
+            **basic_enriched_fields(),
+        }
+
+    scout = make_scout(
+        monkeypatch,
+        tmp_path,
+        collector=fake_collector,
+        enricher=fake_enricher,
+        detail_retriever=FakeDetailRetriever({
+            failing_url: ConnectionError(
+                "temporary network failure"
+            ),
+            ok_url: STRUCTURED_DETAIL_PAGE,
+        }),
+    )
+
+    monkeypatch.setattr(
+        scout,
+        "save_opportunity",
+        lambda item, event_key=None: True,
+    )
+
+    items = scout.run()
+
+    assert len(items) == 2
+
+    by_title = {
+        item["title"]: item for item in items
+    }
+
+    assert (
+        by_title["Network Blip Item"][
+            "availability"
+        ]
+        is None
+        or by_title["Network Blip Item"].get(
+            "availability"
+        )
+        in (None, "Unknown")
+    )
+    assert (
+        by_title["Works Fine Item"][
+            "retail_price"
+        ]
+        == 44.99
+    )
+
+    captured = capsys.readouterr()
+    assert (
+        "[PokemonDetailCollector] detail_fetch "
+        "failed" in captured.out
     )
