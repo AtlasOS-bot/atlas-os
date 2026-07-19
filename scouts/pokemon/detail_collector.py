@@ -26,18 +26,26 @@ from scouts.pokemon.structured_data import (
 )
 
 
-# Reused from scouts/pokemon/poc_playwright_fetch.py and
-# poc_safari_webdriver_fetch.py's proven block-detection markers
-# (duplicated rather than imported - those files are explicitly
-# standalone POCs, not pipeline dependencies).
+# Loosely based on scouts/pokemon/poc_playwright_fetch.py and
+# poc_safari_webdriver_fetch.py's block-detection markers (duplicated
+# rather than imported - those files are explicitly standalone POCs,
+# not pipeline dependencies), but narrowed after a real production
+# false-positive: pokemon.com legitimately loads an async
+# /_Incapsula_Resource bot-fingerprinting script and a reCAPTCHA
+# Enterprise script on every normal page as always-on risk scoring,
+# not only on actual block pages. Bare "incapsula" and "captcha"
+# substrings therefore misclassify real content as blocked. Markers
+# here are restricted to phrases only ever observed on the actual
+# interruption/challenge page itself (see
+# tests/test_pokemon_detail_collector.py for the exact fixtures that
+# proved this).
 PARDON_INTERRUPTION_MARKERS = [
     "pardon our interruption",
 ]
 
 INCAPSULA_ERROR_MARKERS = [
-    "incapsula",
-    "_incapsula_resource",
-    "request unsuccessful",
+    "request unsuccessful. incapsula",
+    "incapsula incident id",
 ]
 
 VIRTUAL_QUEUE_MARKERS = [
@@ -49,7 +57,6 @@ VIRTUAL_QUEUE_MARKERS = [
 ]
 
 CAPTCHA_MARKERS = [
-    "captcha",
     "verify you are human",
     "are you a robot",
 ]
@@ -136,34 +143,34 @@ class RequestsDetailPageRetriever(DetailPageRetriever):
         return raw_content.content
 
 
+def _matched_block_marker(html):
+    lowered = html.lower()
+
+    for marker in BLOCK_MARKERS:
+        if marker in lowered:
+            return marker
+
+    return None
+
+
 def classify_detail_content(html):
     if not html or not html.strip():
         return "EMPTY"
 
-    lowered = html.lower()
-
-    if any(
-        marker in lowered
-        for marker in BLOCK_MARKERS
-    ):
+    if _matched_block_marker(html):
         return "BLOCKED"
 
     return "OK"
 
 
-def resolve_commerce_url_from_gallery_html(
-    html,
-    base_url,
-):
+def find_commerce_links(html, base_url):
     """
-    Scans a pokemon.com gallery/news page's own HTML for an outbound
-    link to a pokemoncenter.com product page. Only resolves when
-    exactly one distinct candidate is found - a gallery listing page
-    linking to many different products is genuinely ambiguous and is
-    left unmapped rather than guessed at.
+    Scans a page's own HTML for outbound links to pokemoncenter.com
+    product pages. Returns every distinct match (order preserved) -
+    callers decide what "ambiguous" means for their purpose.
     """
     if not html:
-        return None
+        return []
 
     soup = BeautifulSoup(html, "html.parser")
     candidates = []
@@ -191,8 +198,21 @@ def resolve_commerce_url_from_gallery_html(
         ):
             candidates.append(absolute)
 
-    unique_candidates = list(
-        dict.fromkeys(candidates)
+    return list(dict.fromkeys(candidates))
+
+
+def resolve_commerce_url_from_gallery_html(
+    html,
+    base_url,
+):
+    """
+    Only resolves when exactly one distinct candidate is found - a
+    gallery listing page linking to many different products is
+    genuinely ambiguous and is left unmapped rather than guessed at.
+    """
+    unique_candidates = find_commerce_links(
+        html,
+        base_url,
     )
 
     if len(unique_candidates) == 1:
@@ -308,6 +328,7 @@ def _has_useful_fields(fields):
             "retail_price",
             "availability_raw",
             "sku",
+            "image_url",
         )
     )
 
@@ -358,7 +379,7 @@ def extract_via_structured_data(html, url):
     }
 
 
-def extract_via_meta_tags(html):
+def extract_via_meta_tags(html, base_url=None):
     soup = BeautifulSoup(html, "html.parser")
 
     def meta(name):
@@ -376,6 +397,14 @@ def extract_via_meta_tags(html):
             else None
         )
 
+    image_url = meta("og:image")
+
+    if image_url and base_url:
+        image_url = urljoin(
+            base_url,
+            image_url,
+        )
+
     fields = {
         "retail_price": (
             meta("product:price:amount")
@@ -389,7 +418,7 @@ def extract_via_meta_tags(html):
             meta("product:availability")
             or meta("og:availability")
         ),
-        "image_url": meta("og:image"),
+        "image_url": image_url,
         "product_title": meta("og:title"),
     }
 
@@ -397,6 +426,42 @@ def extract_via_meta_tags(html):
         return None
 
     return fields
+
+
+MONTH_NAME_DATE_PATTERN = re.compile(
+    r"(?:launch|release date|releases?|"
+    r"available)\s*:?\s*"
+    r"(January|February|March|April|May|"
+    r"June|July|August|September|October|"
+    r"November|December)\s+(\d{1,2}),?\s+"
+    r"(\d{4})",
+    re.IGNORECASE,
+)
+
+
+def extract_release_date_from_text(text):
+    if not text:
+        return None
+
+    match = MONTH_NAME_DATE_PATTERN.search(
+        text
+    )
+
+    if not match:
+        return None
+
+    month_name, day, year = match.groups()
+
+    try:
+        parsed = datetime.strptime(
+            f"{month_name} {day} {year}",
+            "%B %d %Y",
+        )
+
+        return parsed.date().isoformat()
+
+    except ValueError:
+        return None
 
 
 def extract_via_visible_text(html):
@@ -421,64 +486,142 @@ def extract_via_visible_text(html):
     return {
         "retail_price": retail_price,
         "availability_raw": availability_raw,
+        "release_date": (
+            extract_release_date_from_text(
+                text
+            )
+        ),
         "purchase_limit": (
             extract_purchase_limit(text)
         ),
     }
 
 
+# The full set of fields any extraction tier may contribute.
+# Precedence when combining tiers: structured data > meta tags >
+# visible text - a weaker tier only ever fills a field a stronger
+# tier left missing, never overwrites one.
+DETAIL_FIELD_KEYS = [
+    "retail_price",
+    "currency",
+    "availability_raw",
+    "release_date",
+    "sku",
+    "product_id",
+    "image_url",
+    "product_title",
+    "description",
+    "purchase_limit",
+]
+
+
+def _is_missing(value):
+    return value in (None, "", [], {})
+
+
+def _merge_tier_fields(
+    accumulated,
+    tier_fields,
+    tier_name,
+    contributing_sources,
+):
+    contributed = False
+
+    for key in DETAIL_FIELD_KEYS:
+        if key not in tier_fields:
+            continue
+
+        value = tier_fields.get(key)
+
+        if _is_missing(value):
+            continue
+
+        if _is_missing(
+            accumulated.get(key)
+        ):
+            accumulated[key] = value
+            contributed = True
+
+    if contributed:
+        contributing_sources.append(
+            tier_name
+        )
+
+    return contributed
+
+
 def extract_detail_fields(html, url):
+    """
+    Runs all three extraction tiers unconditionally and combines
+    them - a weaker tier only fills fields a stronger tier left
+    missing, it never overwrites an already-populated value. Finding
+    e.g. only image_url via meta tags does not prevent the visible-
+    text tier from being searched for retail price, availability,
+    release date, SKU, or purchase limit.
+
+    Returns every key in DETAIL_FIELD_KEYS (None if never found),
+    plus:
+    - detail_source: the single strongest tier that contributed at
+      least one field (backward-compatible scalar, used for the
+      "_mapped_from_gallery" suffix and existing callers/tests).
+    - detail_sources: every tier that actually contributed at least
+      one field, strongest first - a small provenance list, not a
+      second schema.
+    """
+    accumulated = {
+        key: None
+        for key in DETAIL_FIELD_KEYS
+    }
+    contributing_sources = []
+
     structured = extract_via_structured_data(
         html,
         url,
     )
 
-    if structured and _has_useful_fields(
-        structured
-    ):
-        structured["detail_source"] = (
-            "structured_data"
+    if structured:
+        _merge_tier_fields(
+            accumulated,
+            structured,
+            "structured_data",
+            contributing_sources,
         )
 
-        if "purchase_limit" not in structured:
-            structured["purchase_limit"] = (
-                extract_purchase_limit(
-                    BeautifulSoup(
-                        html,
-                        "html.parser",
-                    ).get_text(" ")
-                )
-            )
-
-        return structured
-
-    meta_fields = extract_via_meta_tags(html)
+    meta_fields = extract_via_meta_tags(
+        html,
+        base_url=_base_url_of(url),
+    )
 
     if meta_fields:
-        meta_fields["detail_source"] = (
-            "meta_tags"
+        _merge_tier_fields(
+            accumulated,
+            meta_fields,
+            "meta_tags",
+            contributing_sources,
         )
-
-        meta_fields["purchase_limit"] = (
-            extract_purchase_limit(
-                BeautifulSoup(
-                    html,
-                    "html.parser",
-                ).get_text(" ")
-            )
-        )
-
-        return meta_fields
 
     text_fields = extract_via_visible_text(
         html
     )
 
-    text_fields["detail_source"] = (
-        "visible_text"
+    _merge_tier_fields(
+        accumulated,
+        text_fields,
+        "visible_text",
+        contributing_sources,
     )
 
-    return text_fields
+    accumulated["detail_sources"] = (
+        contributing_sources
+    )
+
+    accumulated["detail_source"] = (
+        contributing_sources[0]
+        if contributing_sources
+        else "none"
+    )
+
+    return accumulated
 
 
 def _retailer_for_url(url):
@@ -628,6 +771,7 @@ def _stamp(item, detail_source):
     )
 
     stamped["detail_source"] = detail_source
+    stamped.setdefault("detail_sources", [])
     stamped["source_timestamp"] = _utc_now()
 
     stamped.setdefault(
@@ -670,6 +814,69 @@ def _log_stage_failure(stage, url, error):
     )
 
 
+# High-value fields checked to report, per product, which of the
+# fields this whole feature exists to populate actually ended up
+# populated. Only field names/booleans are logged - never field
+# values, cookies, credentials, or headers.
+HIGH_VALUE_FIELDS = [
+    "retail_price",
+    "availability",
+    "sku",
+    "image_url",
+    "release_date",
+    "purchase_limit",
+]
+
+
+def _populated_high_value_fields(item):
+    populated = []
+
+    for field in HIGH_VALUE_FIELDS:
+        value = item.get(field)
+
+        if value not in (None, "", "Unknown"):
+            populated.append(field)
+
+    return populated
+
+
+def _new_diagnostic(url):
+    return {
+        "discovery_url": url,
+        "fetch_status": None,
+        "response_length": None,
+        "blocked": False,
+        "commerce_links_found": None,
+        "mapped_url": None,
+        "extraction_source": None,
+        "fields_populated": [],
+        "reason": None,
+    }
+
+
+def _print_diagnostic(diagnostic):
+    populated = (
+        ",".join(
+            diagnostic["fields_populated"]
+        )
+        or "none"
+    )
+
+    print(
+        "[PokemonDetailCollector] diagnostic "
+        f"url={diagnostic['discovery_url']} "
+        f"fetch={diagnostic['fetch_status']} "
+        f"len={diagnostic['response_length']} "
+        f"blocked={diagnostic['blocked']} "
+        "commerce_links="
+        f"{diagnostic['commerce_links_found']} "
+        f"mapped_url={diagnostic['mapped_url']} "
+        f"source={diagnostic['extraction_source']} "
+        f"populated=[{populated}] "
+        f"reason={diagnostic['reason']}"
+    )
+
+
 def collect_pokemon_product_detail(
     item,
     retriever=None,
@@ -679,13 +886,28 @@ def collect_pokemon_product_detail(
     page. Always returns a dict: either the enriched version, or the
     original item (stamped with detail_source explaining why) if
     enrichment could not be completed. Never raises.
+
+    Prints exactly one concise diagnostic line per call (see
+    _print_diagnostic) so a scheduled run's logs make it possible to
+    tell "ran but the page had nothing useful" apart from "never
+    actually attempted anything" - only URLs, counts, and field
+    names are logged, never cookies, credentials, headers, or field
+    values.
     """
     if not isinstance(item, dict):
         return item
 
     url = item.get("url")
 
+    diagnostic = _new_diagnostic(url)
+
     if not url:
+        diagnostic["fetch_status"] = "skipped"
+        diagnostic["reason"] = (
+            "item_has_no_url"
+        )
+        _print_diagnostic(diagnostic)
+
         return _stamp(item, "no_url")
 
     retriever = (
@@ -697,6 +919,12 @@ def collect_pokemon_product_detail(
         html = retriever.fetch(url)
 
     except Exception as error:
+        diagnostic["fetch_status"] = "error"
+        diagnostic["reason"] = (
+            f"{type(error).__name__}"
+        )
+        _print_diagnostic(diagnostic)
+
         _log_stage_failure(
             stage="detail_fetch",
             url=url,
@@ -705,36 +933,54 @@ def collect_pokemon_product_detail(
 
         return _stamp(item, "fetch_failed")
 
-    if not html:
+    diagnostic["response_length"] = (
+        len(html) if html else 0
+    )
+
+    if not html or not html.strip():
+        diagnostic["fetch_status"] = "empty"
+        diagnostic["reason"] = (
+            "no_content_returned"
+        )
+        _print_diagnostic(diagnostic)
+
         return _stamp(item, "fetch_failed")
 
-    status = classify_detail_content(html)
+    diagnostic["fetch_status"] = "ok"
 
-    if status == "BLOCKED":
-        print(
-            "[PokemonDetailCollector] "
-            f"detail_fetch blocked for {url}: "
-            "bot-protection markers detected."
+    matched_marker = _matched_block_marker(
+        html
+    )
+
+    if matched_marker:
+        diagnostic["blocked"] = True
+        diagnostic["reason"] = (
+            f"block_marker_matched:"
+            f"{matched_marker}"
         )
+        _print_diagnostic(diagnostic)
 
         return _stamp(item, "blocked")
-
-    if status == "EMPTY":
-        return _stamp(
-            item, "empty_response"
-        )
 
     fetch_url = url
     mapped_from_gallery = False
 
     if _is_pokemon_dot_com(url):
+        commerce_links = find_commerce_links(
+            html,
+            base_url=(
+                "https://www.pokemoncenter.com"
+            ),
+        )
+
+        diagnostic[
+            "commerce_links_found"
+        ] = len(commerce_links)
+
         resolved = (
-            resolve_commerce_url_from_gallery_html(
-                html,
-                base_url=(
-                    "https://www.pokemoncenter.com"
-                ),
-            )
+            commerce_links[0]
+            if len(commerce_links) == 1
+            else None
         )
 
         if resolved:
@@ -764,6 +1010,9 @@ def collect_pokemon_product_detail(
                 html = commerce_html
                 fetch_url = resolved
                 mapped_from_gallery = True
+                diagnostic[
+                    "mapped_url"
+                ] = resolved
 
     try:
         detail_fields = extract_detail_fields(
@@ -772,6 +1021,12 @@ def collect_pokemon_product_detail(
         )
 
     except Exception as error:
+        diagnostic["reason"] = (
+            f"parse_error:"
+            f"{type(error).__name__}"
+        )
+        _print_diagnostic(diagnostic)
+
         _log_stage_failure(
             stage="detail_parse",
             url=fetch_url,
@@ -779,6 +1034,17 @@ def collect_pokemon_product_detail(
         )
 
         return _stamp(item, "parse_failed")
+
+    detail_sources = detail_fields.get(
+        "detail_sources",
+        [],
+    )
+
+    diagnostic["extraction_source"] = (
+        "+".join(detail_sources)
+        if detail_sources
+        else "none"
+    )
 
     merged = merge_detail_fields(
         item,
@@ -804,6 +1070,23 @@ def collect_pokemon_product_detail(
         )
 
     merged["detail_source"] = detail_source
+    merged["detail_sources"] = detail_sources
     merged["source_timestamp"] = _utc_now()
+
+    diagnostic["fields_populated"] = (
+        _populated_high_value_fields(merged)
+    )
+
+    diagnostic["reason"] = (
+        "enriched"
+        if diagnostic["fields_populated"]
+        else (
+            "page_fetched_but_no_price_"
+            "availability_sku_image_"
+            "release_date_or_limit_found"
+        )
+    )
+
+    _print_diagnostic(diagnostic)
 
     return merged
