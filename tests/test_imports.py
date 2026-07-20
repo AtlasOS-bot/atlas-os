@@ -9,6 +9,16 @@ MODULES = [
     "brain.atlas_brain",
     "brain.explanation_engine",
 
+    "collector_intelligence.detector",
+    "collector_intelligence.enums",
+    "collector_intelligence.extraction",
+    "collector_intelligence.models",
+    "collector_intelligence.normalize",
+    "collector_intelligence.opportunity_builder",
+    "collector_intelligence.signals",
+    "collector_intelligence.source_models",
+    "collector_intelligence.summary",
+
     "decision.decision_engine",
 
     "learning.engine",
