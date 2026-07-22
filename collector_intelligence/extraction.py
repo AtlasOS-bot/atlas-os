@@ -703,7 +703,7 @@ TRAILING_NAME_STOPWORDS = {
     "with", "featuring", "on", "of", "and",
     "campaign", "collection", "event", "launch", "collaboration",
     "promotional", "promo", "pack", "packs", "exclusive", "official",
-    "release", "edition",
+    "release", "edition", "complete", "set", "sets",
 }
 
 

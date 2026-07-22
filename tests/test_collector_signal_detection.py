@@ -358,6 +358,15 @@ class TestCollaborationExtraction:
         result = extraction.find_collaboration(text)
         assert result["right"] == "ROUND1"
 
+    def test_listing_title_style_name_trims_complete_set_filler(self):
+        # Regression: a listing-title-style mention ("One Piece x
+        # Round1 Complete Promo Set") captured "Round1 Complete" as
+        # the partner name, since "complete"/"set" weren't recognized
+        # as trailing filler.
+        text = "One Piece x Round1 Complete Promo Set"
+        result = extraction.find_collaboration(text)
+        assert result["right"] == "Round1"
+
 
 # ---------------------------------------------------------------
 # detector.py: keyword and structured signal detection
