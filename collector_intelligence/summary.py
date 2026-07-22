@@ -23,6 +23,9 @@ def _format_money(value):
     return f"${numeric_value:,.2f}"
 
 
+format_money = _format_money
+
+
 def _format_money_with_kind(value, kind):
     formatted = _format_money(value)
 
@@ -35,11 +38,17 @@ def _format_money_with_kind(value, kind):
     return formatted
 
 
+format_money_with_kind = _format_money_with_kind
+
+
 def _format_score(value):
     if value is None:
         return "Unknown"
 
     return f"{int(round(value))}/100"
+
+
+format_score = _format_score
 
 
 def _humanize(value):
@@ -53,6 +62,9 @@ def _humanize(value):
     )
 
     return text.replace("_", " ")
+
+
+humanize = _humanize
 
 
 def _build_title(opportunity):
@@ -82,6 +94,9 @@ def _build_title(opportunity):
         )
 
     return left
+
+
+build_title = _build_title
 
 
 def summarize_opportunity(opportunity):

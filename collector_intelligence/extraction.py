@@ -259,38 +259,55 @@ RETAIL_CONTEXT_WORDS = [
 ]
 
 
-def _context_window(text, start, end, radius=45):
+def context_window(text, start, end, radius=45):
     return text[
         max(0, start - radius): end + radius
     ].lower()
 
 
-def classify_price_context(text, start, end):
+# Internal alias used throughout this module.
+_context_window = context_window
+
+
+def classify_price_context(text, start, end, radius=45):
     """
     Decides whether a currency amount most likely represents a
     required spend, an observed/estimated resale price, a plain
-    retail price, or is unclassified, based on nearby words.
+    retail price, or is unclassified, based on nearby words. When
+    multiple price mentions with different roles sit close together
+    (e.g. a spend requirement and a resale price in the same
+    paragraph), the NEAREST context word wins rather than whichever
+    category happens to be checked first - otherwise a resale word
+    attached to a different price could "leak" onto this one.
     """
-    window = _context_window(text, start, end)
+    center = (start + end) / 2
+    lowered = text.lower()
+    window_start = max(0, start - radius)
+    window_end = end + radius
+    local = lowered[window_start:window_end]
 
-    if any(
-        word in window
-        for word in RESALE_CONTEXT_WORDS
+    best_category = None
+    best_distance = None
+
+    for category, words in (
+        ("resale", RESALE_CONTEXT_WORDS),
+        ("spend", SPEND_CONTEXT_WORDS),
+        ("retail", RETAIL_CONTEXT_WORDS),
     ):
-        return "resale"
+        for word in words:
+            index = local.find(word)
 
-    if any(
-        word in window for word in SPEND_CONTEXT_WORDS
-    ):
-        return "spend"
+            while index != -1:
+                absolute_position = window_start + index + len(word) / 2
+                distance = abs(absolute_position - center)
 
-    if any(
-        word in window
-        for word in RETAIL_CONTEXT_WORDS
-    ):
-        return "retail"
+                if best_distance is None or distance < best_distance:
+                    best_distance = distance
+                    best_category = category
 
-    return None
+                index = local.find(word, index + 1)
+
+    return best_category
 
 
 COMPLETE_SET_MARKERS = [
@@ -627,7 +644,7 @@ _NAME_PART = (
 
 COLLAB_SEPARATOR_PATTERN = re.compile(
     r"(" + _NAME_PART + r")"
-    r"\s*(?:×|x|X)\s*"
+    r"(?:\s*×\s*|\s+[xX]\s+)"
     r"(" + _NAME_PART + r")"
 )
 
@@ -685,6 +702,8 @@ TRAILING_NAME_STOPWORDS = {
     "for", "during", "at", "starting", "beginning", "from", "to",
     "with", "featuring", "on", "of", "and",
     "campaign", "collection", "event", "launch", "collaboration",
+    "promotional", "promo", "pack", "packs", "exclusive", "official",
+    "release", "edition",
 }
 
 
@@ -711,6 +730,28 @@ def _clean_name_span(text):
         trimmed.append(word)
 
     return " ".join(trimmed)
+
+
+def _iter_overlapping_matches(pattern, text):
+    """
+    re.finditer only yields non-overlapping matches. When a greedy
+    match starting at a lowercase filler word ("...from the One Piece
+    x Round1...") fails validation downstream, a plain finditer loop
+    has already consumed that span and never retries starting exactly
+    at "One Piece" - silently missing a real collaboration mention.
+    This advances one character at a time instead of past match.end(),
+    so every possible start position gets a chance.
+    """
+    position = 0
+
+    while True:
+        match = pattern.search(text, position)
+
+        if not match:
+            return
+
+        yield match
+        position = match.start() + 1
 
 
 def _looks_like_proper_noun_phrase(text):
@@ -765,9 +806,7 @@ def find_collaboration(text):
                 "matched_text": match.group(0),
             }
 
-    for match in (
-        COLLAB_SEPARATOR_PATTERN.finditer(text)
-    ):
+    for match in _iter_overlapping_matches(COLLAB_SEPARATOR_PATTERN, text):
         left = _clean_name_span(match.group(1))
         right = _clean_name_span(match.group(2))
 

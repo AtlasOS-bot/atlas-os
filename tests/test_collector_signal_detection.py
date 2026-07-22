@@ -327,6 +327,37 @@ class TestCollaborationExtraction:
         assert result["left"] == "One Piece"
         assert "\n" not in result["left"]
 
+    def test_separator_match_retries_after_leading_filler_words(self):
+        # Regression: finditer only yields non-overlapping matches. A
+        # greedy match starting at a lowercase filler word ("from the
+        # One Piece x Round1...") fails the proper-noun check, but a
+        # plain finditer loop had already consumed that span and never
+        # retried starting exactly at "One Piece" - silently missing a
+        # real collaboration mention buried mid-sentence.
+        text = (
+            "Complete promo sets from the One Piece x Round1 collaboration "
+            "reportedly sold for approximately $2,200 on the secondary market."
+        )
+        result = extraction.find_collaboration(text)
+        assert result["left"] == "One Piece"
+        assert result["right"] == "Round1"
+
+    def test_separator_requires_word_boundary_around_x(self):
+        # Regression: an unbounded "x" separator matched inside plain
+        # words (e.g. "appro-x-imately"), producing garbage matches.
+        text = "The price is approximately $200 for the item."
+        result = extraction.find_collaboration(text)
+        assert result is None
+
+    def test_campaign_title_style_name_trims_promotional_filler(self):
+        # Regression: a campaign-title-style mention ("BRAND x PARTNER
+        # PROMOTIONAL PACK CAMPAIGN") captured "PARTNER PROMOTIONAL
+        # PACK" as the partner name, since neither word was recognized
+        # as trailing filler.
+        text = "ONE PIECE x ROUND1 PROMOTIONAL PACK CAMPAIGN"
+        result = extraction.find_collaboration(text)
+        assert result["right"] == "ROUND1"
+
 
 # ---------------------------------------------------------------
 # detector.py: keyword and structured signal detection

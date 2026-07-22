@@ -530,10 +530,15 @@ def _detect_release_window_signals(
     else:
         dates = find_dates(text)
 
-        if dates:
-            first_date = dates[0]
+        # Every date mention becomes its own signal, not just the
+        # first - Module 4 needs to see all of them to distinguish an
+        # announcement date from a release date; opportunity_builder's
+        # single-source draft still just takes the first one (via
+        # _first()), so this doesn't change existing single-date
+        # behavior.
+        for detected_date in dates:
             certainty = classify_certainty(
-                text, first_date["start"]
+                text, detected_date["start"]
             )
 
             detections.append(
@@ -546,13 +551,13 @@ def _detect_release_window_signals(
                             70, source, certainty
                         )
                     ),
-                    evidence_text=first_date[
+                    evidence_text=detected_date[
                         "matched_text"
                     ],
                     evidence_start=(
-                        first_date["start"]
+                        detected_date["start"]
                     ),
-                    evidence_end=first_date["end"],
+                    evidence_end=detected_date["end"],
                     source_field="body",
                     **certainty_flags(certainty),
                 )
