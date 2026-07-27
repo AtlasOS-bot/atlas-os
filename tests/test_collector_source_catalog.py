@@ -731,7 +731,11 @@ class TestHealthState:
         catalog = load_example_catalog()
         source = catalog.sources["pokemon_official_rss"]
         health = ConnectorHealth(connector_name="rss_connector", healthy=False, consecutive_failures=1, last_success_at="2026-07-19T00:00:00+00:00")
-        state = evaluate_source_health(source, health)
+        # Pinned relative to last_success_at (well inside this source's
+        # 168h stale_after window) rather than the real wall clock -
+        # otherwise this test's expected "warning" silently flips to
+        # "stale" once enough real time has passed since 2026-07-19.
+        state = evaluate_source_health(source, health, now=__import__("datetime").datetime(2026, 7, 19, 1, tzinfo=__import__("datetime").timezone.utc))
         assert state.health_status == "warning"
         assert state.recommended_catalog_action == "retry"
 

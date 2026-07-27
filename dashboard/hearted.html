@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Atlas Collector Dashboard</title>
+  <title>Hearted Items</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,7 +16,32 @@
         <button type="button" id="nav-add-item" data-action="add-item">+ Add Item</button>
       </nav>
     </header>
-    <p class="empty-state">No opportunities to show yet.</p>
+    
+    <div class="hearted-controls">
+      <label for="hi-search" class="sr-only">Search hearted items</label>
+      <input id="hi-search" type="search" placeholder="Search...">
+
+      <label for="hi-filter-status" class="sr-only">Filter by status</label>
+      <select id="hi-filter-status">
+        <option value="">All statuses</option>
+        <option value="SAVED">Saved</option>
+        <option value="APPROVED">Approved</option>
+        <option value="DENIED">Denied</option>
+        <option value="PURCHASED">Purchased</option>
+        <option value="SOLD">Sold</option>
+        <option value="ARCHIVED">Archived</option>
+      </select>
+
+      <label for="hi-sort" class="sr-only">Sort</label>
+      <select id="hi-sort">
+        <option value="hearted_at_desc">Newest first</option>
+        <option value="hearted_at_asc">Oldest first</option>
+        <option value="priority">Priority</option>
+        <option value="name">Name</option>
+      </select>
+
+      <button type="button" id="hi-add-manual">+ Add manual item</button>
+    </div><p class="empty-state">No hearted items yet. Heart a product or add one manually.</p>
   </div>
   <div id="drawer" class="drawer" hidden aria-hidden="true">
     <div class="drawer-content" role="dialog" aria-modal="true">

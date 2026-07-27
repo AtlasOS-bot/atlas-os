@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas Collector Dashboard (Demo)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="demo-banner" role="status">DEMO DATA — sample data for local preview only. Not connected to Supabase.</div>
+  <div class="shell">
+    <header class="page-header">
+      <h1>ATLAS</h1>
+      <nav aria-label="Primary">
+        <a href="demo-index.html">All Drops</a>
+        <a href="demo-hearted.html">Hearted Items</a>
+        <button type="button" id="nav-add-item" data-action="add-item">+ Add Item</button>
+      </nav>
+    </header>
+    <section class="cards-grid" aria-label="Opportunities">
+    <article class="card" data-opportunity-id="demo-pitch-black-etb"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;STRONG&quot;, &quot;market_trend&quot;: &quot;RISING&quot;, &quot;demand_tags&quot;: [&quot;Limited promo&quot;, &quot;Low supply&quot;, &quot;Sealed demand&quot;]}" data-hearted="true">
+      <div class="card-image">
+        <img src="assets/demo/pitch-black-etb.svg" alt="Pitch Black ETB" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Pitch Black ETB</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--strong" role="status" aria-label="Market strength: Strong">STRONG</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 2h ago</span>
+          <div class="card-badges"><span class="badge badge--high" role="status" aria-label="Confidence: High">HIGH</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$49.99</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$140</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">RISING <span aria-hidden="true" data-role="trend-symbol">↑</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Limited promo</li><li class="tag">Low supply</li><li class="tag">Sealed demand</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/pitch-black-etb" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/pitch-black-etb" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-pitch-black-etb">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-pitch-black-etb">Edit</button>
+          <button type="button" class="heart-btn heart-btn--hearted" data-action="toggle-heart" data-opportunity-id="demo-pitch-black-etb" aria-pressed="true" aria-label="Remove from Hearted Items"><span aria-hidden="true">♥</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Official licensed release</li><li>Recognized franchise (Pokemon TCG) - weighted modestly, not treated as strong evidence alone</li><li>Retail-to-resale spread ratio 2.8x (observed)</li><li>Rapid sellout observed (under 10 minutes)</li><li>Surging demand</li><li>Limited quantity</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Purchase limit of 1 restricts acquiring multiple units</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-pokemon-center-etb"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;MEDIUM&quot;, &quot;market_trend&quot;: &quot;RISING&quot;, &quot;demand_tags&quot;: [&quot;Sealed demand&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/pokemon-center-etb.svg" alt="Pokemon Center ETB" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Pokemon Center ETB</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--medium" role="status" aria-label="Market strength: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 6h ago</span>
+          <div class="card-badges"><span class="badge badge--high" role="status" aria-label="Confidence: High">HIGH</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$44.99</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$60</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">RISING <span aria-hidden="true" data-role="trend-symbol">↑</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Sealed demand</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/pokemon-center-etb" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/pokemon-center-etb" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-pokemon-center-etb">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-pokemon-center-etb">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-pokemon-center-etb" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Recognized franchise (Pokemon TCG) - weighted modestly, not treated as strong evidence alone</li><li>Retail-to-resale spread ratio 1.3x (observed)</li><li>Rising demand</li><li>Sealed product</li><li>Stated quantity known (1500)</li><li>Stated production quantity: 1500</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-one-piece-round1-promo"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;WEAK&quot;, &quot;market_trend&quot;: &quot;RISING&quot;, &quot;demand_tags&quot;: [&quot;Event exclusive&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/one-piece-round1-promo.svg" alt="ONE PIECE Round1 Promo" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">ONE PIECE Round1 Promo</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--weak" role="status" aria-label="Market strength: Weak">WEAK</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 18h ago</span>
+          <div class="card-badges"><span class="badge badge--medium" role="status" aria-label="Confidence: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">Unknown</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$85</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">RISING <span aria-hidden="true" data-role="trend-symbol">↑</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Event exclusive</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/one-piece-round1-promo" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/one-piece-round1-promo" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-one-piece-round1-promo">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-one-piece-round1-promo">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-one-piece-round1-promo" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Difficult-to-recreate acquisition story (event/convention/tournament exclusive)</li><li>Recognized franchise (One Piece) - weighted modestly, not treated as strong evidence alone</li><li>Rising demand</li><li>Difficult acquisition adds flip premium</li><li>Event/tournament exclusivity</li><li>Event-exclusive distribution</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Redemption uncertainty</li><li>Source type: COMMUNITY</li><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-starbucks-halloween-cup"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;WEAK&quot;, &quot;market_trend&quot;: &quot;STABLE&quot;, &quot;demand_tags&quot;: [&quot;Fast sell-through&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/starbucks-halloween-cup.svg" alt="Starbucks Halloween Cup" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Starbucks Halloween Cup</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--weak" role="status" aria-label="Market strength: Weak">WEAK</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 1d ago</span>
+          <div class="card-badges"><span class="badge badge--medium" role="status" aria-label="Confidence: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$24.99</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$45</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">STABLE <span aria-hidden="true" data-role="trend-symbol">→</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Fast sell-through</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/starbucks-halloween-cup" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/starbucks-halloween-cup" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-starbucks-halloween-cup">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-starbucks-halloween-cup">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-starbucks-halloween-cup" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Retail-to-resale spread ratio 1.8x (observed)</li><li>Rapid sellout observed (same day)</li><li>Observed sold listings: 60</li><li>Rapid sellout (same day)</li><li>Rapid sellout suggests release-day attention</li><li>Partial product identity</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Unclear item identity beyond brand name</li><li>No differentiation from a normal mass-produced product</li><li>Incomplete product identity beyond brand</li><li>Source type: SOCIAL</li><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-disney-lorcana-set"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;MEDIUM&quot;, &quot;market_trend&quot;: &quot;RISING&quot;, &quot;demand_tags&quot;: [&quot;Sealed demand&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/disney-lorcana-set.svg" alt="Disney Lorcana Set" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Disney Lorcana Set (Demo)</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--medium" role="status" aria-label="Market strength: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 10h ago</span>
+          <div class="card-badges"><span class="badge badge--high" role="status" aria-label="Confidence: High">HIGH</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$99.99</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$150</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">RISING <span aria-hidden="true" data-role="trend-symbol">↑</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Sealed demand</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/disney-lorcana-set" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/disney-lorcana-set" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-disney-lorcana-set">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-disney-lorcana-set">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-disney-lorcana-set" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Recognized franchise (Lorcana) - weighted modestly, not treated as strong evidence alone</li><li>Retail-to-resale spread ratio 1.5x (observed)</li><li>Rising demand</li><li>Sealed product</li><li>Low stated quantity (800)</li><li>Stated production quantity: 800</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-dodgers-giveaway"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;WEAK&quot;, &quot;market_trend&quot;: &quot;STABLE&quot;, &quot;demand_tags&quot;: [&quot;Event exclusive&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/dodgers-giveaway.svg" alt="Dodgers Stadium Giveaway Bobblehead" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Dodgers Stadium Giveaway Bobblehead (Demo)</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--weak" role="status" aria-label="Market strength: Weak">WEAK</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 2d ago</span>
+          <div class="card-badges"><span class="badge badge--medium" role="status" aria-label="Confidence: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">Unknown</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$35</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">STABLE <span aria-hidden="true" data-role="trend-symbol">→</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Event exclusive</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/dodgers-giveaway" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/dodgers-giveaway" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-dodgers-giveaway">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-dodgers-giveaway">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-dodgers-giveaway" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Difficult-to-recreate acquisition story (event/convention/tournament exclusive)</li><li>Recognized franchise (Dodgers) - weighted modestly, not treated as strong evidence alone</li><li>Difficult acquisition adds flip premium</li><li>Stated quantity known (40000)</li><li>Event/tournament exclusivity</li><li>Stated production quantity: 40000</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Redemption uncertainty</li><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-funko-convention-exclusive"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;WEAK&quot;, &quot;market_trend&quot;: &quot;RISING&quot;, &quot;demand_tags&quot;: [&quot;Event exclusive&quot;]}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/funko-convention-exclusive.svg" alt="Funko Convention Exclusive Pop!" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">Funko Convention Exclusive Pop! (Demo)</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--strong" role="status" aria-label="Market strength: Strong">STRONG</span><span class="badge badge--override" role="status">Manual override</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 4h ago</span>
+          <div class="card-badges"><span class="badge badge--medium" role="status" aria-label="Confidence: Medium">MEDIUM</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$20</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">$180</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">RISING <span aria-hidden="true" data-role="trend-symbol">↑</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        <ul class="demand-tags" aria-label="Demand tags"><li class="tag">Event exclusive</li></ul>
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/funko-convention-exclusive" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/funko-convention-exclusive" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-funko-convention-exclusive">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-funko-convention-exclusive">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-funko-convention-exclusive" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Difficult-to-recreate acquisition story (event/convention/tournament exclusive)</li><li>Retail-to-resale spread ratio 9.0x (observed)</li><li>Rising demand</li><li>Stated quantity known (1800)</li><li>Stated production quantity: 1800</li><li>Convention-exclusive distribution</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Unclear item identity beyond brand name</li><li>Restricted availability adds acquisition complexity</li><li>Incomplete product identity beyond brand</li><li>No release date or status known</li></ul>
+        </div>
+      </details>
+    </article>
+    <article class="card" data-opportunity-id="demo-lego-insider-set"
+              data-atlas-values="{&quot;market_strength&quot;: &quot;UNKNOWN&quot;, &quot;market_trend&quot;: &quot;UNKNOWN&quot;, &quot;demand_tags&quot;: []}" data-hearted="false">
+      <div class="card-image">
+        <img src="assets/demo/lego-insider-set.svg" alt="LEGO Insider Exclusive Set" loading="lazy"
+             class="">
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <h3 class="card-title">LEGO Insider Exclusive Set (Demo)</h3>
+          <div class="card-badges" data-role="strength-badges"><span data-role="strength-badge" class="badge badge--unknown" role="status" aria-label="Market strength: Unknown">UNKNOWN</span></div>
+        </div>
+        <div class="card-meta">
+          <span class="updated-time">Updated 3d ago</span>
+          <div class="card-badges"><span class="badge badge--high" role="status" aria-label="Confidence: High">HIGH</span></div>
+        </div>
+        <div class="card-stats">
+          <div class="stat"><span class="stat-label">MSRP</span><span class="stat-value">$59.99</span></div>
+          <div class="stat"><span class="stat-label">Last sold</span><span class="stat-value">Unknown</span></div>
+          <div class="stat"><span class="stat-label">Trend</span><span class="stat-value" data-role="trend-value">UNKNOWN <span aria-hidden="true" data-role="trend-symbol">?</span></span></div>
+          <div class="stat"><span class="stat-label">Unit</span><span class="stat-value">Single item</span></div>
+        </div>
+        
+        <div class="card-actions">
+          <a class="action-link" href="https://example.com/demo/lego-insider-set" target="_blank" rel="noopener noreferrer">View Product</a><a class="action-link" href="https://example.com/demo/ebay-sold/lego-insider-set" target="_blank" rel="noopener noreferrer">eBay Sold</a>
+          <button type="button" class="action-btn" data-action="notes" data-opportunity-id="demo-lego-insider-set">Notes</button>
+          <button type="button" class="action-btn" data-action="edit" data-opportunity-id="demo-lego-insider-set">Edit</button>
+          <button type="button" class="heart-btn heart-btn--not-hearted" data-action="toggle-heart" data-opportunity-id="demo-lego-insider-set" aria-pressed="false" aria-label="Save to Hearted Items"><span aria-hidden="true">♡</span></button>
+        </div>
+      </div>
+      <details class="card-details">
+        <summary>Why Atlas rated this market this way</summary>
+        <div class="details-body">
+          <ul class="why-bullets"><li>Official licensed release</li><li>Source type: OFFICIAL</li><li>Partial product identity</li><li>Buy-side price known</li></ul>
+          <h4>Risks</h4><ul class="risk-bullets"><li>Unclear item identity beyond brand name</li><li>No differentiation from a normal mass-produced product</li><li>Incomplete product identity beyond brand</li></ul>
+        </div>
+      </details>
+    </article></section>
+  </div>
+  <div id="drawer" class="drawer" hidden aria-hidden="true">
+    <div class="drawer-content" role="dialog" aria-modal="true">
+      <button type="button" class="drawer-close" data-action="cancel-drawer" aria-label="Close">&times;</button>
+      <div id="drawer-body"></div>
+    </div>
+  </div>
+  <template id="manual-item-form-template">
+    <form id="manual-item-form" class="drawer-form" aria-label="Add manual item">
+      <h2>Add manual item</h2>
+      <label for="mi-product-name">Product name</label>
+      <input id="mi-product-name" name="product_name" type="text" required>
+
+      <label for="mi-image-url">Product image URL</label>
+      <input id="mi-image-url" name="image_url" type="url" placeholder="https://...">
+
+      <label for="mi-product-link">Product link</label>
+      <input id="mi-product-link" name="product_link" type="url" placeholder="https://...">
+
+      <label for="mi-ebay-link">eBay sold link</label>
+      <input id="mi-ebay-link" name="ebay_sold_link" type="url" placeholder="https://...">
+
+      <label for="mi-msrp">MSRP</label>
+      <input id="mi-msrp" name="msrp" type="number" step="0.01" min="0">
+
+      <label for="mi-last-sold">Last sold price</label>
+      <input id="mi-last-sold" name="last_sold_price" type="number" step="0.01" min="0">
+
+      <label for="mi-market-strength">Market strength</label>
+      <select id="mi-market-strength" name="market_strength">
+        <option value="UNKNOWN">Unknown</option>
+        <option value="STRONG">Strong</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="WEAK">Weak</option>
+      </select>
+
+      <label for="mi-category">Category</label>
+      <input id="mi-category" name="category" type="text">
+
+      <label for="mi-priority">Priority</label>
+      <select id="mi-priority" name="priority">
+        <option value="">None</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+
+      <label for="mi-target-price">Target price</label>
+      <input id="mi-target-price" name="target_price" type="number" step="0.01" min="0">
+
+      <label for="mi-quantity">Quantity</label>
+      <input id="mi-quantity" name="quantity" type="number" step="1" min="0">
+
+      <label for="mi-tags">Tags (comma separated)</label>
+      <input id="mi-tags" name="tags" type="text">
+
+      <label for="mi-notes">My Notes</label>
+      <textarea id="mi-notes" name="notes" rows="3"></textarea>
+
+      <div class="form-actions">
+        <button type="submit">Save item</button>
+        <button type="button" data-action="cancel-drawer">Cancel</button>
+      </div>
+    </form></template>
+  <script src="app.js"></script>
+</body>
+</html>
