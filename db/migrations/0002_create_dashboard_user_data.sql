@@ -8,8 +8,17 @@
 -- manually via the Supabase SQL editor (or `psql`) against the
 -- target project, same as 0001.
 --
--- SECURITY NOTE - READ BEFORE APPLYING
+-- SECURITY NOTE - SUPERSEDED, kept for history
 -- =====================================
+-- Everything below originally described dashboard/app.js writing to
+-- these tables directly from the browser with Supabase's anon key.
+-- That architecture is gone: app.js now calls this app's own /api/*
+-- routes (server/routes_api.py) behind a password-protected session,
+-- using the service-role key server-side. See
+-- 0003_enable_dashboard_rls_policies.sql (revised) for the RLS model
+-- that actually applies now - anon gets no access to these tables at
+-- all. The original text is left as-is below for history.
+--
 -- The dashboard (dashboard/app.js) writes to the tables below
 -- directly from the browser using Supabase's anon key, the same
 -- pattern the existing dashboard/index.html already uses for reads.
@@ -183,11 +192,11 @@ create index if not exists
 
 
 -- =====================================================================
--- RECOMMENDED (NOT APPLIED) Row Level Security policies.
--- Uncomment and apply only after reviewing them against your own
--- security requirements - see the SECURITY NOTE at the top of this
--- file. These assume a single personal user accessing via the anon
--- key, with no authentication system in this codebase.
+-- SUPERSEDED - do not apply the block below. Use
+-- 0003_enable_dashboard_rls_policies.sql (revised) instead, which
+-- enables RLS with NO anon/authenticated access at all, matching the
+-- password-protected deployment's service-role-only model. Left
+-- unapplied here for history only.
 -- =====================================================================
 
 -- alter table public.opportunity_user_overrides enable row level security;

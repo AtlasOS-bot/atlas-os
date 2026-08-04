@@ -7,59 +7,64 @@
  * Python (collector_intelligence/dashboard_view.py) when this page
  * was generated. This file only:
  *   - fetches/writes personal data (hearts, notes, overrides, manual
- *     items) via Supabase's REST API
+ *     items) via this app's own /api/* routes
  *   - toggles DOM state (heart icon, drawer open/close)
  *   - handles form submission
  *   - does client-side search/filter/sort over already-rendered rows
  *
  * =====================================================================
- * SECURITY NOTE - READ BEFORE ENABLING WRITES IN PRODUCTION
+ * SECURITY NOTE
  * =====================================================================
- * This uses Supabase's ANON key only - never a service-role key or
- * any credential capable of bypassing Row Level Security. That is
- * correct and required, but it is NOT sufficient on its own: whether
- * these writes are actually safe depends entirely on the RLS policies
- * attached to the tables below in your live Supabase project, which
- * this codebase cannot see or verify (see the commented-out policy
- * recommendations in db/migrations/0002_create_dashboard_user_data.sql).
- * Until you have confirmed appropriate policies are in place, treat
- * every write in this file as NOT VERIFIED SECURE beyond personal,
- * local use - do not deploy this publicly without reviewing that.
+ * This file holds no Supabase URL, anon key, or service key - it
+ * never talks to Supabase directly. Every read/write goes to a
+ * same-origin /api/* route (server/routes_api.py), which is the only
+ * place the Supabase service key exists, and which requires an
+ * authenticated session (server/app.py's AuthMiddleware) plus, for
+ * every state-changing request, a matching Origin header and the
+ * per-session CSRF token embedded in this page's <meta> tag (see
+ * server/security_deps.py). A 401 response here means the session
+ * expired or was never valid - api() below sends the browser back to
+ * /login when that happens.
  * =====================================================================
  */
 
-const SUPABASE_URL = "https://fdvgndlwajhjyxttfiht.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GTuwSWGgSpmZScE4T4Beww_DQEDZ839";
-
-const TABLES = {
-  overrides: "opportunity_user_overrides",
-  overrideHistory: "opportunity_override_history",
-  notes: "opportunity_notes",
-  heartedItems: "hearted_items",
-  heartedItemNotes: "hearted_item_notes",
-};
-
 // ---------------------------------------------------------------
-// Supabase REST helpers
+// Same-origin API helper
 // ---------------------------------------------------------------
 
-async function sb(method, table, { query = "", body = null, prefer = null } = {}) {
-  const headers = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    "Content-Type": "application/json",
-  };
-  if (prefer) headers["Prefer"] = prefer;
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute("content") : null;
+}
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+async function api(method, path, { body = null } = {}) {
+  const headers = {};
+  let requestBody;
+
+  if (body !== null) {
+    headers["Content-Type"] = "application/json";
+    requestBody = JSON.stringify(body);
+  }
+  if (method !== "GET") {
+    const token = getCsrfToken();
+    if (token) headers["X-CSRF-Token"] = token;
+  }
+
+  const response = await fetch(path, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: requestBody,
+    credentials: "same-origin",
   });
+
+  if (response.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Supabase ${method} ${table} failed (${response.status}): ${text}`);
+    throw new Error(`${method} ${path} failed (${response.status}): ${text}`);
   }
 
   const text = await response.text();
@@ -106,14 +111,9 @@ async function toggleHeart(button) {
 
   try {
     if (currentlyHearted) {
-      await sb("DELETE", TABLES.heartedItems, {
-        query: `?opportunity_id=eq.${encodeURIComponent(opportunityId)}`,
-      });
+      await api("DELETE", `/api/hearted/by-opportunity/${encodeURIComponent(opportunityId)}`);
     } else {
-      await sb("POST", TABLES.heartedItems, {
-        body: { opportunity_id: opportunityId, status: "SAVED" },
-        prefer: "return=minimal",
-      });
+      await api("POST", "/api/hearted", { body: { opportunity_id: opportunityId } });
     }
   } catch (err) {
     // Roll back on failure.
@@ -139,9 +139,7 @@ async function unheartFromHeartedItemsPage(button) {
   if (!confirm("Remove this item from Hearted Items?")) return;
 
   try {
-    await sb("DELETE", TABLES.heartedItems, {
-      query: `?id=eq.${encodeURIComponent(heartedItemId)}`,
-    });
+    await api("DELETE", `/api/hearted/${encodeURIComponent(heartedItemId)}`);
     const row = button.closest(".hearted-row");
     if (row) row.remove();
   } catch (err) {
@@ -156,10 +154,8 @@ async function toggleArchive(button) {
   const currentlyArchived = row.dataset.archived === "true";
 
   try {
-    await sb("PATCH", TABLES.heartedItems, {
-      query: `?id=eq.${encodeURIComponent(heartedItemId)}`,
-      body: { archived_at: currentlyArchived ? null : new Date().toISOString() },
-      prefer: "return=minimal",
+    await api("PATCH", `/api/hearted/${encodeURIComponent(heartedItemId)}/archive`, {
+      body: { archived: !currentlyArchived },
     });
     row.dataset.archived = currentlyArchived ? "false" : "true";
     button.textContent = currentlyArchived ? "Archive" : "Unarchive";
@@ -213,30 +209,24 @@ async function openNotesDrawer(opportunityId, heartedItemId) {
     </div>`;
   openDrawer();
 
-  const table = opportunityId ? TABLES.notes : TABLES.heartedItemNotes;
-  const filterField = opportunityId ? "opportunity_id" : "hearted_item_id";
-  const filterValue = opportunityId || heartedItemId;
+  const scope = opportunityId ? "opportunity" : "hearted_item";
+  const subjectId = opportunityId || heartedItemId;
 
   const notesList = document.getElementById("notes-list");
 
   async function refresh() {
-    const notes = await sb("GET", table, {
-      query: `?${filterField}=eq.${encodeURIComponent(filterValue)}&order=updated_at.desc`,
-    });
+    const notes = await api("GET", `/api/notes?scope=${scope}&subject_id=${encodeURIComponent(subjectId)}`);
     notesList.innerHTML = notes.length
       ? notes.map(renderNoteItem).join("")
       : "<li>No notes yet.</li>";
-    wireNoteButtons(table, filterField, filterValue, refresh);
+    wireNoteButtons(scope, refresh);
   }
 
   document.getElementById("note-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const body = event.target.elements.body.value.trim();
     if (!body) return;
-    await sb("POST", table, {
-      body: { [filterField]: filterValue, body },
-      prefer: "return=minimal",
-    });
+    await api("POST", "/api/notes", { body: { scope, subject_id: subjectId, body } });
     event.target.reset();
     await refresh();
   });
@@ -255,11 +245,11 @@ function renderNoteItem(note) {
   </li>`;
 }
 
-function wireNoteButtons(table, filterField, filterValue, refresh) {
+function wireNoteButtons(scope, refresh) {
   document.querySelectorAll(".note-delete").forEach((button) => {
     button.addEventListener("click", async () => {
       if (!confirm("Delete this note?")) return;
-      await sb("DELETE", table, { query: `?id=eq.${encodeURIComponent(button.dataset.noteId)}` });
+      await api("DELETE", `/api/notes/${encodeURIComponent(button.dataset.noteId)}?scope=${scope}`);
       await refresh();
     });
   });
@@ -358,10 +348,7 @@ async function openOverrideDrawer(card) {
     </form>`;
   openDrawer();
 
-  const existing = await sb("GET", TABLES.overrides, {
-    query: `?opportunity_id=eq.${encodeURIComponent(opportunityId)}&limit=1`,
-  });
-  const current = existing && existing[0];
+  const current = await api("GET", `/api/overrides/${encodeURIComponent(opportunityId)}`);
 
   const form = document.getElementById("override-form");
   if (current) {
@@ -372,21 +359,18 @@ async function openOverrideDrawer(card) {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await saveOverride(opportunityId, form, atlasValues, current);
+    await saveOverride(opportunityId, form, atlasValues);
     closeDrawer();
   });
 
   document.getElementById("ov-reset").addEventListener("click", async () => {
     try {
-      if (current) {
-        await sb("DELETE", TABLES.overrides, { query: `?opportunity_id=eq.${encodeURIComponent(opportunityId)}` });
-        if (current.market_strength_override) {
-          await recordOverrideHistory(opportunityId, "market_strength", atlasValues.market_strength, current.market_strength_override, null, "Reset to Atlas assessment");
-        }
-        if (current.market_trend_override) {
-          await recordOverrideHistory(opportunityId, "market_trend", atlasValues.market_trend, current.market_trend_override, null, "Reset to Atlas assessment");
-        }
-      }
+      await api("DELETE", `/api/overrides/${encodeURIComponent(opportunityId)}`, {
+        body: {
+          atlas_market_strength: atlasValues.market_strength,
+          atlas_market_trend: atlasValues.market_trend,
+        },
+      });
       applyOverrideToCard(opportunityId, {}, atlasValues);
       closeDrawer();
     } catch (err) {
@@ -396,53 +380,21 @@ async function openOverrideDrawer(card) {
   });
 }
 
-async function saveOverride(opportunityId, form, atlasValues, previous) {
+async function saveOverride(opportunityId, form, atlasValues) {
   const payload = {
-    opportunity_id: opportunityId,
     market_strength_override: form.elements.market_strength_override.value || null,
     market_trend_override: form.elements.market_trend_override.value || null,
     reason: form.elements.reason.value || null,
-    updated_at: new Date().toISOString(),
+    atlas_market_strength: atlasValues.market_strength || null,
+    atlas_market_trend: atlasValues.market_trend || null,
   };
 
-  if (previous) {
-    await sb("PATCH", TABLES.overrides, {
-      query: `?opportunity_id=eq.${encodeURIComponent(opportunityId)}`,
-      body: payload,
-      prefer: "return=minimal",
-    });
-  } else {
-    await sb("POST", TABLES.overrides, { body: payload, prefer: "return=minimal" });
-  }
-
-  if (payload.market_strength_override !== (previous && previous.market_strength_override)) {
-    await recordOverrideHistory(
-      opportunityId, "market_strength", atlasValues.market_strength,
-      previous && previous.market_strength_override, payload.market_strength_override, payload.reason,
-    );
-  }
-  if (payload.market_trend_override !== (previous && previous.market_trend_override)) {
-    await recordOverrideHistory(
-      opportunityId, "market_trend", atlasValues.market_trend,
-      previous && previous.market_trend_override, payload.market_trend_override, payload.reason,
-    );
-  }
+  // The server upserts the override AND records override history for
+  // any changed field in one call - app.js no longer computes or
+  // sends history entries itself.
+  await api("PUT", `/api/overrides/${encodeURIComponent(opportunityId)}`, { body: payload });
 
   applyOverrideToCard(opportunityId, payload, atlasValues);
-}
-
-async function recordOverrideHistory(opportunityId, fieldName, atlasValue, previousValue, newValue, reason) {
-  await sb("POST", TABLES.overrideHistory, {
-    body: {
-      opportunity_id: opportunityId,
-      field_name: fieldName,
-      atlas_value_snapshot: atlasValue,
-      previous_override_value: previousValue,
-      new_override_value: newValue,
-      reason,
-    },
-    prefer: "return=minimal",
-  });
 }
 
 // ---------------------------------------------------------------
@@ -711,7 +663,6 @@ function openManualItemDrawer() {
     }
 
     const payload = readManualItemPayload(form, { includeIdentity: true });
-    payload.status = "SAVED";
 
     if (!payload.product_name) {
       alert("Product name is required.");
@@ -719,9 +670,8 @@ function openManualItemDrawer() {
     }
 
     try {
-      const created = await sb("POST", TABLES.heartedItems, { body: payload, prefer: "return=representation" });
+      const item = await api("POST", "/api/hearted/manual", { body: payload });
       closeDrawer();
-      const item = created && created[0];
       if (item) {
         if (document.getElementById("hi-search")) {
           insertNewHeartedRow(item);
@@ -754,10 +704,7 @@ async function openEditHeartedItemDrawer(heartedItemId, isManual) {
     form.insertBefore(note, form.querySelector("label"));
   }
 
-  const existing = await sb("GET", TABLES.heartedItems, {
-    query: `?id=eq.${encodeURIComponent(heartedItemId)}&limit=1`,
-  });
-  const item = existing && existing[0];
+  const item = await api("GET", `/api/hearted/${encodeURIComponent(heartedItemId)}`).catch(() => null);
   if (!item) {
     alert("Could not load this item.");
     closeDrawer();
@@ -783,13 +730,9 @@ async function openEditHeartedItemDrawer(heartedItemId, isManual) {
     }
 
     try {
-      const updated = await sb("PATCH", TABLES.heartedItems, {
-        query: `?id=eq.${encodeURIComponent(heartedItemId)}`,
-        body: payload,
-        prefer: "return=representation",
-      });
+      payload.include_identity = isManual;
+      const updatedItem = await api("PATCH", `/api/hearted/${encodeURIComponent(heartedItemId)}`, { body: payload });
       closeDrawer();
-      const updatedItem = updated && updated[0];
       const row = findHeartedRow(heartedItemId);
       if (updatedItem && row) applyHeartedItemFieldsToRow(row, updatedItem, { isManual });
     } catch (err) {

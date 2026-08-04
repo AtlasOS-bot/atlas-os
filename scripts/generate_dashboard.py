@@ -14,25 +14,30 @@ db/README.md). Run it yourself from the repo root:
 
     python scripts/generate_dashboard.py
 
-Configuration (env vars, both optional):
-    SUPABASE_URL         - defaults to the same project URL already
-                            committed in dashboard/app.js.
-    SUPABASE_ANON_KEY    - defaults to the same publishable anon key
-                            already committed in dashboard/app.js and
-                            the legacy dashboard/index.html. This is
-                            not a secret - Supabase anon/publishable
-                            keys are designed to be public.
+Configuration (env vars):
+    SUPABASE_URL          - defaults to the same project URL already
+                             committed in dashboard/app.js (not a
+                             secret - just a project identifier).
+    SUPABASE_SERVICE_KEY  - REQUIRED, no default. As of the password-
+                             protected deployment, anon has no access
+                             to collector_opportunities or any dashboard
+                             table (db/migrations/0003 and 0005) - this
+                             script now reads with the same service-role
+                             credential the GitHub Actions pipeline and
+                             the FastAPI app use, matching every other
+                             trusted server-side script in this repo
+                             (atlas/*.py). Set it in your own shell
+                             (never commit it) before running this.
 
 Read-only: this script only ever issues GET requests, against
 collector_opportunities and the 6 Module 8 tables (see
 db/migrations/0001 and 0002). It never writes.
 
-Whether these tables exist in your live project, whether Row Level
-Security is enabled on them, and whether the anon key can read them is
-NOT something this repository can verify - see db/README.md. This
-script does not assume success: it reports exactly what it could and
-could not read from each table, and treats anything unreadable as
-absent data rather than inventing a fallback value for it.
+Whether these tables exist in your live project is NOT something this
+repository can verify - see db/README.md. This script does not assume
+success: it reports exactly what it could and could not read from each
+table, and treats anything unreadable as absent data rather than
+inventing a fallback value for it.
 """
 
 import os
@@ -57,14 +62,18 @@ from collector_intelligence.decision_engine import evaluate_opportunity  # noqa:
 from collector_intelligence.models import CollectorOpportunity  # noqa: E402
 
 
-# Same values already committed in dashboard/app.js and the legacy
-# dashboard/index.html - reused here, not invented. A publishable anon
-# key is meant to be public; this script uses no other credential.
+# Not a secret - the project URL is already public in dashboard/app.js.
 DEFAULT_SUPABASE_URL = "https://fdvgndlwajhjyxttfiht.supabase.co"
-DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_GTuwSWGgSpmZScE4T4Beww_DQEDZ839"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", DEFAULT_SUPABASE_URL)
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", DEFAULT_SUPABASE_ANON_KEY)
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+
+if not SUPABASE_SERVICE_KEY:
+    raise SystemExit(
+        "SUPABASE_SERVICE_KEY is required (anon no longer has access to "
+        "any of these tables - see db/migrations/0003 and 0005). Set it "
+        "in your shell before running this script; never commit it."
+    )
 
 DASHBOARD_DIR = os.path.join(REPO_ROOT, "dashboard")
 
@@ -98,8 +107,8 @@ def fetch_table(table, timeout=15):
     guess whether a table is reachable."""
     url = f"{SUPABASE_URL}/rest/v1/{table}?select=*"
     headers = {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
     }
     try:
         response = requests.get(url, headers=headers, timeout=timeout)
