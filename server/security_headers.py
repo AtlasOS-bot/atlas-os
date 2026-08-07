@@ -9,11 +9,12 @@ inner middleware (AuthMiddleware, BodySizeLimitMiddleware) short-
 circuits before a route handler ever runs.
 
 CSP notes:
+
 - No 'unsafe-eval' anywhere.
 - No 'unsafe-inline' anywhere either. The one place that would have
   needed it (the login page's CSS) was moved to an external file
   instead (server/login_page.py, served via /login.css) - see that
-  module's docstring. There is no other inline <style>/<script> or
+  module's docstring. There is no other inline <script> or
   style="..."/on*="..." attribute anywhere in this app (dashboard/app.js
   and collector_intelligence/dashboard_render.py were both checked).
 - img-src allows any https: source, not a fixed allowlist - Atlas
@@ -46,10 +47,9 @@ CSP = (
 SECURITY_HEADERS = {
     "Content-Security-Policy": CSP,
     "X-Content-Type-Options": "nosniff",
-    # Legacy fallback alongside CSP's frame-ancestors - harmless
-    # belt-and-suspenders for anything not honoring the CSP directive.
+    # Legacy fallback alongside CSP's frame-ancestors.
     "X-Frame-Options": "DENY",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "same-origin",
     "Permissions-Policy": (
         "camera=(), microphone=(), geolocation=(), payment=(), "
         "usb=(), interest-cohort=()"
