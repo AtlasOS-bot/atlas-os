@@ -32,9 +32,10 @@ create table if not exists public.auth_sessions (
     revoked_at timestamptz
 );
 
-create index if not exists auth_sessions_token_hash_idx
-    on public.auth_sessions (session_token_hash);
-
+-- No separate index on session_token_hash: the `unique` constraint
+-- above already creates one automatically. A second, single-column
+-- index on the same column would be pure duplication - extra write
+-- overhead on every insert/update with no query benefit.
 create index if not exists auth_sessions_expires_at_idx
     on public.auth_sessions (expires_at);
 

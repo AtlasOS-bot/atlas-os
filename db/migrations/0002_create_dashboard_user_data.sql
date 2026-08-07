@@ -72,12 +72,25 @@ create unique index if not exists
 create table if not exists public.opportunity_override_history (
     id uuid primary key default gen_random_uuid(),
     opportunity_id text not null,
+    -- Matches dashboard_models.py's OVERRIDABLE_FIELDS - the closed
+    -- set of fields an override is ever allowed to touch. Only
+    -- "market_strength"/"market_trend" are written by the current API
+    -- layer (server/routes_api.py); the other four are included
+    -- because they're already valid per the Python model, not because
+    -- they're wired up yet.
     field_name text not null,
     atlas_value_snapshot jsonb,
     previous_override_value jsonb,
     new_override_value jsonb,
     reason text,
-    changed_at timestamptz not null default now()
+    changed_at timestamptz not null default now(),
+
+    constraint opportunity_override_history_field_name_check check (
+        field_name in (
+            'market_strength', 'market_trend', 'demand_tags',
+            'collector_classification', 'image', 'tags'
+        )
+    )
 );
 
 create index if not exists
@@ -119,6 +132,10 @@ create table if not exists public.hearted_items (
     ebay_sold_link text,
     msrp numeric,
     last_sold_price numeric,
+    -- Same vocabulary as opportunity_user_overrides.market_strength_override
+    -- (dashboard_models.py's VALID_MARKET_STRENGTHS) - this column is
+    -- actively written by ManualItemBody.market_strength in
+    -- server/routes_api.py, defaulting to 'UNKNOWN'.
     market_strength text,
 
     hearted_at timestamptz not null default now(),
@@ -129,6 +146,10 @@ create table if not exists public.hearted_items (
     ),
     constraint hearted_items_manual_identity_check check (
         opportunity_id is not null or product_name is not null
+    ),
+    constraint hearted_items_market_strength_check check (
+        market_strength is null
+        or market_strength in ('STRONG', 'MEDIUM', 'WEAK', 'UNKNOWN')
     )
 );
 

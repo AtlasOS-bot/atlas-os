@@ -14,7 +14,7 @@
 -- acceptable: querying Supabase directly with the anon key must not
 -- be able to bypass it. This migration closes that gap for
 -- collector_opportunities specifically (0003 already closed it for
--- the 6 dashboard tables; 0004's new auth tables are locked down from
+-- the 7 dashboard tables; 0004's new auth tables are locked down from
 -- the start).
 --
 -- scripts/generate_dashboard.py was updated in the same change to

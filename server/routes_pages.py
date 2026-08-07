@@ -15,13 +15,14 @@ guessing the URL while the feature is off.
 
 from pathlib import Path
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from server.auth import attempt_login, logout as revoke_current_session
 from server.client_ip import resolve_client_ip
 from server.csrf import csrf_token_for, is_allowed_origin, session_token_from_cookie
 from server.login_page import LOGIN_CSS, render_login_page
+from server.security_deps import require_protected_write
 from server.sessions import COOKIE_NAME
 
 router = APIRouter()
@@ -83,7 +84,7 @@ async def login_submit(request: Request, password: str = Form(...)):
     return response
 
 
-@router.get("/logout", include_in_schema=False)
+@router.post("/logout", include_in_schema=False, dependencies=[Depends(require_protected_write)])
 async def logout_route(request: Request):
     cookie_value = request.cookies.get(COOKIE_NAME)
     revoke_current_session(request.app.state.supabase, cookie_value)

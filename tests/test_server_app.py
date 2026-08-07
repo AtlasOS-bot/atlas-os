@@ -157,7 +157,12 @@ class TestProtectedPages:
     def test_revoked_cookie_redirects_to_login(self):
         client, _ = make_client()
         cookie = login(client)
-        client.get("/logout", cookies={"atlas_session": cookie})
+        page = client.get("/", cookies={"atlas_session": cookie})
+        csrf_token = _extract_csrf_token(page.text)
+        client.post(
+            "/logout", cookies={"atlas_session": cookie},
+            headers={"Origin": "http://testserver", "Content-Type": "application/json", "X-CSRF-Token": csrf_token},
+        )
         response = client.get("/", cookies={"atlas_session": cookie}, follow_redirects=False)
         assert response.status_code == 303
         assert response.headers["location"] == "/login"
@@ -317,6 +322,76 @@ class TestApiCsrfAndOriginProtection:
             json=big_payload,
         )
         assert response.status_code == 413
+
+
+class TestLogoutProtection:
+    """/logout revokes a session - a state-changing action - so it goes
+    through the same require_protected_write dependency as every /api/*
+    mutation, not a bare unauthenticated GET. Same CSRF-gap shape and
+    same test pattern as TestApiCsrfAndOriginProtection above."""
+
+    def _authenticated(self):
+        client, fake = make_client()
+        cookie = login(client)
+        page = client.get("/", cookies={"atlas_session": cookie})
+        csrf_token = _extract_csrf_token(page.text)
+        return client, fake, cookie, csrf_token
+
+    def test_get_no_longer_accepted(self):
+        client, fake, cookie, _ = self._authenticated()
+        response = client.get("/logout", cookies={"atlas_session": cookie}, follow_redirects=False)
+        assert response.status_code == 405
+
+    def test_logout_without_csrf_token_rejected(self):
+        client, fake, cookie, _ = self._authenticated()
+        response = client.post(
+            "/logout", cookies={"atlas_session": cookie},
+            headers={"Origin": "http://testserver", "Content-Type": "application/json"},
+        )
+        assert response.status_code == 403
+        # Session must still be valid - the rejected logout had no effect.
+        follow_up = client.get("/", cookies={"atlas_session": cookie}, follow_redirects=False)
+        assert follow_up.status_code == 200
+
+    def test_logout_with_wrong_csrf_token_rejected(self):
+        client, fake, cookie, _ = self._authenticated()
+        response = client.post(
+            "/logout", cookies={"atlas_session": cookie},
+            headers={
+                "Origin": "http://testserver", "Content-Type": "application/json",
+                "X-CSRF-Token": "wrong-token",
+            },
+        )
+        assert response.status_code == 403
+
+    def test_logout_with_wrong_origin_rejected(self):
+        client, fake, cookie, csrf_token = self._authenticated()
+        response = client.post(
+            "/logout", cookies={"atlas_session": cookie},
+            headers={
+                "Origin": "https://evil.example.com", "Content-Type": "application/json",
+                "X-CSRF-Token": csrf_token,
+            },
+        )
+        assert response.status_code == 403
+        follow_up = client.get("/", cookies={"atlas_session": cookie}, follow_redirects=False)
+        assert follow_up.status_code == 200
+
+    def test_valid_logout_revokes_session(self):
+        client, fake, cookie, csrf_token = self._authenticated()
+        response = client.post(
+            "/logout", cookies={"atlas_session": cookie},
+            headers={
+                "Origin": "http://testserver", "Content-Type": "application/json",
+                "X-CSRF-Token": csrf_token,
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == "/login"
+        follow_up = client.get("/", cookies={"atlas_session": cookie}, follow_redirects=False)
+        assert follow_up.status_code == 303
+        assert follow_up.headers["location"] == "/login"
 
 
 class TestApiHeartedFlow:
