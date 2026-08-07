@@ -65,6 +65,17 @@ async def login_css():
 @router.post("/login", include_in_schema=False)
 async def login_submit(request: Request, password: str = Form(...)):
     config = request.app.state.config
+
+    # TEMPORARY DEBUG - remove after diagnosing the origin check. repr()
+    # deliberately used so hidden whitespace/newlines are visible in the
+    # log output rather than silently invisible.
+    print(
+        "DEBUG /login origin check -- "
+        f"Origin header: {request.headers.get('origin')!r} | "
+        f"Referer header: {request.headers.get('referer')!r} | "
+        f"config.public_origin: {config.public_origin!r}"
+    )
+
     origin_ok = is_allowed_origin(request.headers.get("origin"), request.headers.get("referer"), config)
 
     if not origin_ok:
