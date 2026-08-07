@@ -1,3 +1,8 @@
+import requests
+
+from brain.atlas_brain import (
+    AtlasBrain,
+)
 from scouts.base.atlas_scout import (
     AtlasScout,
 )
@@ -614,9 +619,9 @@ class PokemonScout(
 
                 try:
                     saved = (
-                        self.save_opportunity(
+                        self.save_collector_opportunity(
                             item,
-                            event_key=event_key,
+                            event_key,
                         )
                     )
 
@@ -926,6 +931,107 @@ class PokemonScout(
             f"{alert_record['event']}:"
             f"{alert_record['alert_id']}"
         )
+
+    def collector_opportunity_exists(self, event_key):
+        response = requests.get(
+            (
+                f"{self.supabase_url}"
+                "/rest/v1/collector_opportunities"
+            ),
+            headers=self.headers(),
+            params={
+                "opportunity_id": (
+                    f"eq.{event_key}"
+                ),
+                "select": "id",
+                "limit": "1",
+            },
+            timeout=20,
+        )
+
+        response.raise_for_status()
+
+        return bool(response.json())
+
+    def save_collector_opportunity(self, item, event_key):
+        """
+        Writes to collector_opportunities (Module 1's table, which
+        scripts/generate_dashboard.py actually reads) instead of the
+        legacy opportunities table AtlasScout.save_opportunity() uses.
+        Mirrors save_opportunity()'s existing behavior (duplicate
+        check, learning-engine recording, print output) - only the
+        target table and payload shape differ.
+        """
+        if self.collector_opportunity_exists(event_key):
+            print(
+                "Duplicate skipped "
+                "(event already recorded):",
+                item["title"],
+            )
+            return False
+
+        analysis = AtlasBrain.analyze(
+            item=item,
+            category=self.category,
+        )
+
+        recommendation = analysis["decision"]
+        if recommendation == "STRONG WATCH":
+            recommendation = "WATCH"
+
+        payload = {
+            "opportunity_id": event_key,
+            "dedup_key": event_key,
+            "brand": item.get("brand", self.brand),
+            "product_name": item["title"],
+            "source_url": item["url"],
+            "confidence_score": analysis["score"],
+            "recommendation": recommendation,
+            "reasoning": [
+                analysis.get(
+                    "explanation",
+                    "No explanation yet.",
+                )
+            ],
+        }
+
+        response = requests.post(
+            (
+                f"{self.supabase_url}"
+                "/rest/v1/collector_opportunities"
+            ),
+            headers=self.headers(),
+            json=payload,
+            timeout=20,
+        )
+
+        if response.status_code == 409:
+            print(
+                "Duplicate skipped "
+                "(event already recorded, "
+                "race detected):",
+                item["title"],
+            )
+            return False
+
+        response.raise_for_status()
+
+        self.learning_engine.record(
+            item=item,
+            analysis=analysis,
+        )
+
+        print("Saved:", item["title"])
+        print(
+            "Decision:",
+            analysis["decision"],
+        )
+        print(
+            "Confidence:",
+            analysis["confidence"],
+        )
+
+        return True
 
     def _mark_opportunity_forwarded_safe(
         self,

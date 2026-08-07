@@ -159,7 +159,7 @@ def test_successful_full_run_processes_all_items(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -238,7 +238,7 @@ def test_partial_source_results_are_processed_normally(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -269,7 +269,7 @@ def test_total_collection_failure_does_not_crash_run(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -331,7 +331,7 @@ def test_malformed_item_does_not_stop_remaining_items(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -396,7 +396,7 @@ def test_enricher_failure_for_one_item_does_not_stop_others(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -448,7 +448,7 @@ def test_release_calendar_persistence_failure_does_not_crash_run(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -529,7 +529,7 @@ def test_alert_persistence_failure_does_not_prevent_remaining_processing(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -705,7 +705,7 @@ def test_new_product_forwards_one_opportunity(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -754,7 +754,7 @@ def test_repeated_observation_of_same_event_does_not_forward_again(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -812,7 +812,7 @@ def test_later_distinct_restock_after_sold_out_can_forward(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -887,7 +887,7 @@ def test_price_drop_event_follows_the_same_forwarding_rule(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -965,7 +965,7 @@ def test_successful_persistence_marks_only_the_matching_alert_event(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -1020,7 +1020,7 @@ def test_raised_persistence_does_not_mark_event_as_forwarded(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         failing_save_opportunity,
     )
 
@@ -1083,7 +1083,7 @@ def test_failed_persistence_can_retry_successfully_on_a_later_run(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         flaky_save_opportunity,
     )
 
@@ -1148,7 +1148,7 @@ def test_collector_fault_isolation_still_works_alongside_forwarding_gate(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -1201,7 +1201,7 @@ def test_duplicate_event_key_result_marks_local_record_forwarded(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         fake_save_opportunity,
     )
 
@@ -1288,7 +1288,7 @@ def test_detail_collection_enriches_item_before_state_tracking(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -1354,7 +1354,7 @@ def test_one_detail_fetch_failure_does_not_block_other_products(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
@@ -1437,7 +1437,7 @@ def test_detail_collection_start_marker_prints_before_first_product(
 
     monkeypatch.setattr(
         scout,
-        "save_opportunity",
+        "save_collector_opportunity",
         lambda item, event_key=None: True,
     )
 
