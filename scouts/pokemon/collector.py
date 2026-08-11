@@ -175,6 +175,11 @@ class PokemonScout(
         items = self.collect()
 
         print(
+            f"DEBUG: collect() returned "
+            f"{len(items)} enriched items"
+        )
+
+        print(
             f"Found {len(items)} unique "
             "Pokémon candidates"
         )
@@ -203,6 +208,11 @@ class PokemonScout(
         meaningful_change_count = 0
         alert_count = 0
         failed_item_count = 0
+
+        print(
+            f"DEBUG: beginning run() loop over "
+            f"{len(items)} items"
+        )
 
         for item in items[:50]:
             if not isinstance(item, dict):
