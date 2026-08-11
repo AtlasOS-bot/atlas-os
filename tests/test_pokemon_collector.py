@@ -548,16 +548,24 @@ def test_alert_persistence_failure_does_not_prevent_remaining_processing(
 
     assert len(items) == 2
 
-    # Opportunity forwarding is gated on having a persisted, trackable
-    # alert-event record (see _resolve_eligible_alert_record). When alert
-    # persistence itself always fails, there is no reliable event identity
-    # to forward against or later mark as forwarded, so save_opportunity
-    # is correctly never attempted here. This is intentional: forwarding
-    # without a trackable record would risk re-forwarding the same event
-    # on every future scan, which is exactly the bug this gating exists
-    # to prevent. Item iteration and catalog persistence remain isolated
-    # from the alert-persistence failure regardless.
-    assert saved_titles == []
+    # Both items are first-ever observations (NEW_PRODUCT), so
+    # _resolve_eligible_alert_record's NEW_PRODUCT branch (see
+    # scouts/pokemon/collector.py) makes them eligible for opportunity
+    # persistence independently of alert_store - alert persistence
+    # failing no longer blocks it. The no-repeat-forwarding invariant
+    # this test originally protected still holds, just via a different
+    # mechanism: PokemonStateTracker.observe() persists each product's
+    # state unconditionally, before alert_store is ever touched, and
+    # _compare() can only classify a given product_key as NEW_PRODUCT
+    # once (when no previous state exists) - so this path can never
+    # fire twice for the same product on a later scan, regardless of
+    # whether alert_store is healthy. Item iteration and catalog
+    # persistence remain isolated from the alert-persistence failure
+    # regardless, same as before.
+    assert saved_titles == [
+        "Pokémon Center Poster Collection",
+        "Pokémon Center Binder",
+    ]
 
     catalog = scout.catalog_store.load()
     assert catalog["count"] == 2
@@ -724,7 +732,7 @@ def test_new_product_forwards_one_opportunity(
     )
 
 
-def test_repeated_observation_of_same_event_does_not_forward_again(
+def test_repeated_observation_of_same_event_upserts_the_same_opportunity(
     monkeypatch,
     tmp_path,
 ):
@@ -748,8 +756,10 @@ def test_repeated_observation_of_same_event_does_not_forward_again(
 
     save_calls = []
 
-    def fake_save_opportunity(item, event_key=None):
-        save_calls.append(item["title"])
+    def fake_save_opportunity(item, opportunity_id=None):
+        save_calls.append(
+            (item["title"], opportunity_id)
+        )
         return True
 
     monkeypatch.setattr(
@@ -763,11 +773,15 @@ def test_repeated_observation_of_same_event_does_not_forward_again(
     assert len(save_calls) == 1
 
     # Second scan: identical availability, so state_tracker reports
-    # NO_CHANGE and no fresh alert is created. The prior NEW_PRODUCT
-    # alert is already forwarded, so it must not be forwarded again.
+    # NO_CHANGE. Persistence is unconditional and identity-stable
+    # (see save_collector_opportunity/run()) - the product is
+    # upserted again rather than skipped, but it targets the exact
+    # same opportunity_id both times, proving this refreshes one row
+    # instead of creating a second.
     scout.run()
 
-    assert len(save_calls) == 1
+    assert len(save_calls) == 2
+    assert save_calls[0][1] == save_calls[1][1]
 
 
 def test_later_distinct_restock_after_sold_out_can_forward(

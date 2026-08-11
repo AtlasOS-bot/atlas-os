@@ -70,6 +70,16 @@ class FakeSupabaseOpportunities:
                 if row.get("item_name") == value
             ]
 
+        if "opportunity_id" in params:
+            value = params["opportunity_id"].removeprefix(
+                "eq."
+            )
+            matches = [
+                row
+                for row in matches
+                if row.get("opportunity_id") == value
+            ]
+
         return FakeResponse(
             [{"id": row["id"]} for row in matches]
         )
@@ -91,6 +101,17 @@ class FakeSupabaseOpportunities:
         self._next_id += 1
         self.rows.append(row)
         return FakeResponse([row])
+
+    def patch(self, url, headers, params, json, timeout=None):
+        value = params["opportunity_id"].removeprefix("eq.")
+        updated = []
+
+        for row in self.rows:
+            if row.get("opportunity_id") == value:
+                row.update(json)
+                updated.append(row)
+
+        return FakeResponse(updated)
 
 
 class FakeResponse:
@@ -131,6 +152,11 @@ def make_scout(monkeypatch, tmp_path, fake_supabase, availability_sequence):
         atlas_scout_module.requests,
         "post",
         fake_supabase.post,
+    )
+    monkeypatch.setattr(
+        atlas_scout_module.requests,
+        "patch",
+        fake_supabase.patch,
     )
 
     call_index = {"value": 0}
@@ -188,10 +214,24 @@ def make_scout(monkeypatch, tmp_path, fake_supabase, availability_sequence):
     return scout
 
 
-def test_restock_after_sold_out_reaches_fake_supabase_as_a_new_row(
+def test_restock_after_sold_out_upserts_the_same_opportunity_row(
     monkeypatch,
     tmp_path,
 ):
+    """
+    collector_opportunities holds one stable row per product
+    (opportunity_id = {category}:{product_key} - see
+    PokemonScout.run()/save_collector_opportunity()), not one row
+    per transition. This is a deliberate change from the table's
+    earlier event-keyed identity, which used to create a distinct
+    row per NEW_PRODUCT/SOLD_OUT/RESTOCK occurrence - superseded once
+    it became clear that model conflicted with collector_opportunities'
+    own "one row per stable opportunity_id" schema design and with
+    how hearted items/notes/overrides key off a single opportunity_id
+    per product. The alert store is unrelated to this identity change
+    and is verified separately below to confirm it's untouched: it
+    still records one alert per genuine transition, exactly as before.
+    """
     fake_supabase = FakeSupabaseOpportunities()
 
     scout = make_scout(
@@ -209,24 +249,17 @@ def test_restock_after_sold_out_reaches_fake_supabase_as_a_new_row(
     assert len(fake_supabase.rows) == 1
 
     scout.run()  # SOLD_OUT
-    assert len(fake_supabase.rows) == 2
+    assert len(fake_supabase.rows) == 1
 
-    scout.run()  # RESTOCK - the reported bug scenario
-    assert len(fake_supabase.rows) == 3
+    scout.run()  # RESTOCK - the originally reported bug scenario
+    assert len(fake_supabase.rows) == 1
 
-    # The defining proof: all three rows share the identical,
-    # customer-facing product URL and title - nothing was corrupted
-    # or replaced to force uniqueness - yet three distinct rows exist,
-    # each with its own event_key.
-    urls = {row["official_url"] for row in fake_supabase.rows}
-    names = {row["item_name"] for row in fake_supabase.rows}
-    event_keys = {row["event_key"] for row in fake_supabase.rows}
-    assert urls == {
+    row = fake_supabase.rows[0]
+    assert row["source_url"] == (
         "https://www.pokemoncenter.com/"
         "product/regression-etb"
-    }
-    assert names == {"Pokémon Center Regression ETB"}
-    assert len(event_keys) == 3
+    )
+    assert row["product_name"] == "Pokémon Center Regression ETB"
 
     events = sorted(
         alert["event"]
@@ -243,16 +276,22 @@ def test_restock_after_sold_out_reaches_fake_supabase_as_a_new_row(
     )
 
 
-def test_unmodified_opportunity_exists_would_have_blocked_the_restock(
+def test_opportunity_exists_no_longer_gates_collector_persistence(
     monkeypatch,
     tmp_path,
 ):
     """
-    Proves the fix works by routing around the existing check, not by
-    weakening it: at the moment of the restock, calling the original,
-    untouched opportunity_exists() directly on the same item still
-    correctly reports a duplicate by URL - confirming the underlying
-    product-level check was never modified.
+    PokemonScout now persists via save_collector_opportunity(), which
+    writes to collector_opportunities - not the legacy opportunities
+    table AtlasScout.opportunity_exists() still queries. The two are
+    unrelated tables, so opportunity_exists() genuinely finds nothing
+    here (correct - it was never modified, and nothing writes
+    official_url-shaped rows to `opportunities` for Pokémon anymore).
+    This proves the old, coarse URL-based check plays no role in
+    collector persistence either way: it doesn't block the restock,
+    and it isn't what allows it either - the stable, product_key-
+    derived opportunity_id/dedup_key on collector_opportunities is
+    the only thing that does.
     """
 
     fake_supabase = FakeSupabaseOpportunities()
@@ -280,10 +319,12 @@ def test_unmodified_opportunity_exists_would_have_blocked_the_restock(
         "brand": "Pokemon",
     }
 
-    assert scout.opportunity_exists(restock_item) is True
+    assert scout.opportunity_exists(restock_item) is False
 
-    scout.run()  # RESTOCK still succeeds via event_key
-    assert len(fake_supabase.rows) == 3
+    scout.run()  # RESTOCK still succeeds via the stable opportunity_id
+    # Upsert semantics: this refreshes the same row rather than
+    # adding a third one.
+    assert len(fake_supabase.rows) == 1
 
 
 def test_repeated_polling_of_unchanged_state_creates_no_further_rows(

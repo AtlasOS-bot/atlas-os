@@ -1,3 +1,5 @@
+import traceback
+
 import requests
 
 from brain.atlas_brain import (
@@ -607,21 +609,29 @@ class PokemonScout(
                 ),
             )
 
-            if eligible_alert_record is None:
-                not_eligible_count += 1
+            # Persistence into collector_opportunities is
+            # unconditional and identity-stable - every
+            # analyzed item upserts its own row, regardless of
+            # alert eligibility. This is intentionally decoupled
+            # from eligible_alert_record below, which now exists
+            # purely for alert/notification bookkeeping.
+            product_key = (
+                state_change or {}
+            ).get("product_key")
 
-            else:
-                event_key = (
-                    self._build_event_key(
-                        eligible_alert_record
-                    )
+            saved = None
+
+            if product_key:
+                opportunity_id = (
+                    f"{self.category}:"
+                    f"{product_key}"
                 )
 
                 try:
                     saved = (
                         self.save_collector_opportunity(
                             item,
-                            event_key,
+                            opportunity_id,
                         )
                     )
 
@@ -642,33 +652,33 @@ class PokemonScout(
                 if saved is True:
                     saved_count += 1
 
-                    self._mark_opportunity_forwarded_safe(
-                        alert_id=eligible_alert_record[
-                            "alert_id"
-                        ],
-                        item=item,
-                    )
-
                 elif saved is False:
                     duplicate_count += 1
 
-                    # event_key is unique per genuine
-                    # transition, so a False result here
-                    # proves this exact event was already
-                    # successfully persisted (by this
-                    # process or an earlier/concurrent one)
-                    # - safe to mark forwarded, and this
-                    # self-heals a local flag that failed to
-                    # persist after a prior successful save.
-                    self._mark_opportunity_forwarded_safe(
-                        alert_id=eligible_alert_record[
-                            "alert_id"
-                        ],
-                        item=item,
-                    )
-
                 else:
                     opportunity_failed_count += 1
+
+            if eligible_alert_record is None:
+                not_eligible_count += 1
+
+            elif saved is not None:
+                # saved is True (inserted/updated) or False (lost an
+                # insert race - someone else's write is confirmed to
+                # exist) - either way the opportunity is known to
+                # exist, so mark the matching alert forwarded so it
+                # isn't retried as a stale, unresolved alert on a
+                # later run. Only saved is None (never attempted, or
+                # a genuine failure) should skip this. No
+                # longer gated on event_key/save_opportunity
+                # succeeding for this specific alert - it's
+                # purely alert bookkeeping now, independent of
+                # collector_opportunities persistence.
+                self._mark_opportunity_forwarded_safe(
+                    alert_id=eligible_alert_record[
+                        "alert_id"
+                    ],
+                    item=item,
+                )
 
         try:
             catalog_result = (
@@ -908,6 +918,20 @@ class PokemonScout(
         if not product_key:
             return None
 
+        # A first-ever observation should always become a trackable
+        # opportunity, even if its alert score didn't clear
+        # should_alert()'s threshold - that threshold is about
+        # alerting urgency, not about whether the product should
+        # exist in collector_opportunities at all. state_tracker only
+        # reports NEW_PRODUCT once per product_key ever, so this
+        # can't fire again for the same product on a later run.
+        if (state_change or {}).get("event") == "NEW_PRODUCT":
+            return {
+                "product_key": product_key,
+                "event": "NEW_PRODUCT",
+                "alert_id": "new_product",
+            }
+
         record = (
             self.alert_store.active_record_for(
                 product_key
@@ -924,6 +948,12 @@ class PokemonScout(
 
         return record
 
+    # Unused - no longer the identity for collector_opportunities
+    # (see save_collector_opportunity/run(), which now use a stable
+    # {category}:{product_key} opportunity_id instead). Left in place:
+    # this shape of identity is reserved for a future event/history
+    # log (one row per RESTOCK/SOLD_OUT/PRICE_DROP occurrence),
+    # distinct from collector_opportunities' one-row-per-product model.
     def _build_event_key(self, alert_record):
         return (
             f"{self.category}:"
@@ -932,7 +962,7 @@ class PokemonScout(
             f"{alert_record['alert_id']}"
         )
 
-    def collector_opportunity_exists(self, event_key):
+    def collector_opportunity_exists(self, opportunity_id):
         response = requests.get(
             (
                 f"{self.supabase_url}"
@@ -941,7 +971,7 @@ class PokemonScout(
             headers=self.headers(),
             params={
                 "opportunity_id": (
-                    f"eq.{event_key}"
+                    f"eq.{opportunity_id}"
                 ),
                 "select": "id",
                 "limit": "1",
@@ -953,83 +983,153 @@ class PokemonScout(
 
         return bool(response.json())
 
-    def save_collector_opportunity(self, item, event_key):
+    def save_collector_opportunity(self, item, opportunity_id):
         """
-        Writes to collector_opportunities (Module 1's table, which
-        scripts/generate_dashboard.py actually reads) instead of the
-        legacy opportunities table AtlasScout.save_opportunity() uses.
-        Mirrors save_opportunity()'s existing behavior (duplicate
-        check, learning-engine recording, print output) - only the
-        target table and payload shape differ.
+        Upserts one row per product into collector_opportunities
+        (Module 1's table, which scripts/generate_dashboard.py
+        actually reads) instead of the legacy opportunities table
+        AtlasScout.save_opportunity() uses. opportunity_id is a
+        stable {category}:{product_key} identity (see run()) - the
+        same product observed again updates its existing row instead
+        of creating a new one, matching collector_opportunities' own
+        "one row per stable opportunity_id" design.
         """
-        if self.collector_opportunity_exists(event_key):
-            print(
-                "Duplicate skipped "
-                "(event already recorded):",
-                item["title"],
-            )
-            return False
-
-        analysis = AtlasBrain.analyze(
-            item=item,
-            category=self.category,
+        # TEMPORARY DEBUG - instrumenting the production path to find
+        # the exact point execution stops. Remove once the blocker is
+        # identified. Does not change behavior: exceptions are printed
+        # with a full traceback and then re-raised unchanged, so the
+        # existing caller-side handling in run() is unaffected.
+        title = item.get("title")
+        print(
+            f"DEBUG[1] entering save_collector_opportunity: "
+            f"{title!r} opportunity_id={opportunity_id!r}"
         )
 
-        recommendation = analysis["decision"]
-        if recommendation == "STRONG WATCH":
-            recommendation = "WATCH"
+        try:
+            print(
+                f"DEBUG[2] AtlasBrain.analyze() starting: {title!r}"
+            )
 
-        payload = {
-            "opportunity_id": event_key,
-            "dedup_key": event_key,
-            "brand": item.get("brand", self.brand),
-            "product_name": item["title"],
-            "source_url": item["url"],
-            "confidence_score": analysis["score"],
-            "recommendation": recommendation,
-            "reasoning": [
-                analysis.get(
-                    "explanation",
-                    "No explanation yet.",
+            analysis = AtlasBrain.analyze(
+                item=item,
+                category=self.category,
+            )
+
+            print(
+                f"DEBUG[3] AtlasBrain.analyze() completed: "
+                f"{title!r} score={analysis.get('score')!r} "
+                f"decision={analysis.get('decision')!r}"
+            )
+
+            recommendation = analysis["decision"]
+            if recommendation == "STRONG WATCH":
+                recommendation = "WATCH"
+
+            payload = {
+                "opportunity_id": opportunity_id,
+                "dedup_key": opportunity_id,
+                "brand": item.get("brand", self.brand),
+                "product_name": item["title"],
+                "source_url": item["url"],
+                "confidence_score": analysis["score"],
+                "recommendation": recommendation,
+                "reasoning": [
+                    analysis.get(
+                        "explanation",
+                        "No explanation yet.",
+                    )
+                ],
+            }
+
+            exists = self.collector_opportunity_exists(
+                opportunity_id
+            )
+            print(
+                f"DEBUG[4] collector_opportunity_exists() result: "
+                f"{exists!r} opportunity_id={opportunity_id!r}"
+            )
+
+            if exists:
+                print(f"DEBUG[5] PATCH selected: {title!r}")
+
+                response = requests.patch(
+                    (
+                        f"{self.supabase_url}"
+                        "/rest/v1/collector_opportunities"
+                    ),
+                    headers=self.headers(),
+                    params={
+                        "opportunity_id": (
+                            f"eq.{opportunity_id}"
+                        ),
+                    },
+                    json=payload,
+                    timeout=20,
                 )
-            ],
-        }
 
-        response = requests.post(
-            (
-                f"{self.supabase_url}"
-                "/rest/v1/collector_opportunities"
-            ),
-            headers=self.headers(),
-            json=payload,
-            timeout=20,
-        )
+                print(
+                    f"DEBUG[6] PATCH HTTP status: "
+                    f"{response.status_code}"
+                )
 
-        if response.status_code == 409:
-            print(
-                "Duplicate skipped "
-                "(event already recorded, "
-                "race detected):",
-                item["title"],
+                response.raise_for_status()
+
+                print("Updated:", item["title"])
+
+            else:
+                print(f"DEBUG[5] POST selected: {title!r}")
+
+                response = requests.post(
+                    (
+                        f"{self.supabase_url}"
+                        "/rest/v1/collector_opportunities"
+                    ),
+                    headers=self.headers(),
+                    json=payload,
+                    timeout=20,
+                )
+
+                print(
+                    f"DEBUG[6] POST HTTP status: "
+                    f"{response.status_code}"
+                )
+
+                if response.status_code == 409:
+                    # Lost an insert race against a concurrent/earlier
+                    # writer for this exact opportunity_id - the other
+                    # writer's row is the correct outcome, not a failure.
+                    print(
+                        "Duplicate skipped "
+                        "(race detected):",
+                        item["title"],
+                    )
+                    return False
+
+                response.raise_for_status()
+
+                print("Saved:", item["title"])
+
+            self.learning_engine.record(
+                item=item,
+                analysis=analysis,
             )
-            return False
 
-        response.raise_for_status()
+            print(
+                "Decision:",
+                analysis["decision"],
+            )
+            print(
+                "Confidence:",
+                analysis["confidence"],
+            )
 
-        self.learning_engine.record(
-            item=item,
-            analysis=analysis,
-        )
-
-        print("Saved:", item["title"])
-        print(
-            "Decision:",
-            analysis["decision"],
-        )
-        print(
-            "Confidence:",
-            analysis["confidence"],
-        )
+        except Exception:
+            print(
+                f"DEBUG[7] EXCEPTION in "
+                f"save_collector_opportunity for {title!r}:"
+            )
+            traceback.print_exc()
+            raise
 
         return True
 
