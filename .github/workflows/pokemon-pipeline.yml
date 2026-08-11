@@ -63,6 +63,13 @@ jobs:
             exit 1
           fi
 
+      - name: Upload Pokémon scout log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokemon-scout-log
+          path: pokemon-scout.log
+
       - name: Save Pokémon pipeline state
         if: always()
         uses: actions/cache/save@v4
