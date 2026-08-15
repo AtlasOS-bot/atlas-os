@@ -973,11 +973,15 @@ class PokemonScout(
         )
 
     def collector_opportunity_exists(self, opportunity_id):
+        url = (
+            f"{self.supabase_url}"
+            "/rest/v1/collector_opportunities"
+        )
+
+        print(f"DEBUG: GET {url}")
+
         response = requests.get(
-            (
-                f"{self.supabase_url}"
-                "/rest/v1/collector_opportunities"
-            ),
+            url,
             headers=self.headers(),
             params={
                 "opportunity_id": (
@@ -988,6 +992,17 @@ class PokemonScout(
             },
             timeout=20,
         )
+
+        print(
+            f"DEBUG: GET status "
+            f"{response.status_code}"
+        )
+
+        if response.status_code >= 300:
+            print(
+                f"DEBUG: GET response body: "
+                f"{response.text[:500]!r}"
+            )
 
         response.raise_for_status()
 
@@ -1051,6 +1066,12 @@ class PokemonScout(
                 ],
             }
 
+            print(
+                f"DEBUG[3.5] calling "
+                f"collector_opportunity_exists() for "
+                f"opportunity_id={opportunity_id!r}"
+            )
+
             exists = self.collector_opportunity_exists(
                 opportunity_id
             )
@@ -1059,14 +1080,20 @@ class PokemonScout(
                 f"{exists!r} opportunity_id={opportunity_id!r}"
             )
 
+            url = (
+                f"{self.supabase_url}"
+                "/rest/v1/collector_opportunities"
+            )
+
             if exists:
                 print(f"DEBUG[5] PATCH selected: {title!r}")
+                print(
+                    f"DEBUG: PATCH {url}"
+                    f"?opportunity_id=eq.{opportunity_id}"
+                )
 
                 response = requests.patch(
-                    (
-                        f"{self.supabase_url}"
-                        "/rest/v1/collector_opportunities"
-                    ),
+                    url,
                     headers=self.headers(),
                     params={
                         "opportunity_id": (
@@ -1082,18 +1109,22 @@ class PokemonScout(
                     f"{response.status_code}"
                 )
 
+                if response.status_code >= 300:
+                    print(
+                        f"DEBUG: PATCH response body: "
+                        f"{response.text[:500]!r}"
+                    )
+
                 response.raise_for_status()
 
                 print("Updated:", item["title"])
 
             else:
                 print(f"DEBUG[5] POST selected: {title!r}")
+                print(f"DEBUG: POST {url}")
 
                 response = requests.post(
-                    (
-                        f"{self.supabase_url}"
-                        "/rest/v1/collector_opportunities"
-                    ),
+                    url,
                     headers=self.headers(),
                     json=payload,
                     timeout=20,
@@ -1103,6 +1134,12 @@ class PokemonScout(
                     f"DEBUG[6] POST HTTP status: "
                     f"{response.status_code}"
                 )
+
+                if response.status_code >= 300:
+                    print(
+                        f"DEBUG: POST response body: "
+                        f"{response.text[:500]!r}"
+                    )
 
                 if response.status_code == 409:
                     # Lost an insert race against a concurrent/earlier
